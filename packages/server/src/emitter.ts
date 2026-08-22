@@ -11,9 +11,10 @@ import {
 } from '@satellite-mock/protocol'
 import type { Device } from './devices.js'
 import type { Subscription } from './events.js'
-import { RenderBudget } from './render/budget.js'
+import type { RenderBudget } from './render/budget.js'
 import { sampleLedsToBuffer } from './render/leds.js'
-import { ButtonRenderer, type Rotation } from './render/renderer.js'
+import type { ButtonRenderer } from './render/renderer.js'
+import { type Rotation } from './render/renderer.js'
 import { DEFAULT_BUTTON_STYLE, type ButtonStyle } from './render/buttonStyle.js'
 import type { SatelliteConnection } from './transport/types.js'
 
@@ -259,6 +260,6 @@ export function formatColor(color: string, format: 'hex' | 'rgb'): string {
 	if (format === 'hex') return color
 	const hex = color.replace('#', '')
 	const value = parseInt(hex, 16)
-	// eslint-disable-next-line no-bitwise
+
 	return `rgb(${(value >> 16) & 0xff},${(value >> 8) & 0xff},${value & 0xff})`
 }
