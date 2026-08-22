@@ -323,7 +323,7 @@ public.
 
 ---
 
-## Phase 11 — Docs and App-review readiness (S)
+## Phase 11 — Docs and App-review readiness (S) — ✅ done
 
 1. `README.md` quickstart; keep `docs/protocol.md`, `docs/design.md` current; add
    `docs/scenarios.md` and `docs/security.md`.
@@ -331,6 +331,32 @@ public.
    headless client and asserts it sees the Unclaimed surface.
 3. A short note for client evaluation describing the demo server and what an evaluator will see.
 4. Refresh `docs/protocol.md` against the then-current upstream commit and record the hash.
+
+**Outcome.** `docs/scenarios.md` and `docs/security.md` written, README rewritten, and
+`scripts/smoke.mjs` added — it connects a real client and asserts the zero-interaction path end to end
+(handshake, surface accepted, Unclaimed screen, claim code drawn, bitmaps at the negotiated size and
+containing actual rendered content). That last check matters because a container with no fonts
+serves perfectly healthy-looking black buttons, and `/healthz` cannot tell you.
+
+---
+
+## What is not done
+
+Stated plainly rather than rounded up.
+
+- **Two scenarios from the catalogue are missing**: a subscriptions demo that streams `SUB-STATE`
+  as page content changes, and a device-config demo that renders a client's `CONFIG_FIELDS` as a
+  form and pushes `DEVICE-CONFIG` back. The _protocol_ side of both is implemented and tested —
+  `ADD-SUB`/`REMOVE-SUB`/`SUB-PRESS`/`SUB-ROTATE` work and push initial state, and `CONFIG_FIELDS`
+  is parsed and surfaced — but neither has a scenario driving it or UI to edit values.
+- **Reconnect-blackout and force-disconnect-with-close-code** chaos tools are not built. Plain force
+  disconnect is.
+- **The soak test.** It needs an hour of wall clock to mean anything.
+- **The Docker build has never run.** There is no daemon in the environment this was built in, so
+  CI will be its first execution. The Dockerfile is written and the CI job builds and smoke tests
+  the image, but treat the first CI run as the real verification.
+- **`@napi-rs/canvas` is verified on x64 glibc only.** The image is Alpine (musl); the musl prebuild
+  exists and is declared, but has not been executed here.
 
 ---
 

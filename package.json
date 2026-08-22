@@ -21,7 +21,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "yarn workspace @satellite-mock/server dev",
-    "check": "yarn format:check && yarn lint && yarn typecheck && yarn test"
+    "check": "yarn format:check && yarn lint && yarn typecheck && yarn test",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

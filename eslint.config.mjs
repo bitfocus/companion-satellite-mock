@@ -23,6 +23,22 @@ export default tseslint.config(
 		},
 	},
 	{
+		// Standalone Node scripts: plain JS, outside any tsconfig, so the shared TS config's
+		// environment does not reach them and the Node globals have to be declared.
+		files: ['scripts/**/*.mjs'],
+		languageOptions: {
+			globals: {
+				process: 'readonly',
+				console: 'readonly',
+				Buffer: 'readonly',
+				setTimeout: 'readonly',
+				clearTimeout: 'readonly',
+				setInterval: 'readonly',
+				clearInterval: 'readonly',
+			},
+		},
+	},
+	{
 		// The protocol package must stay pure: no I/O, so that it can be unit tested in isolation and
 		// diffed against upstream. See docs/design.md §5.1.
 		//
