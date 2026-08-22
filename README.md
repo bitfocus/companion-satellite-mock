@@ -2,7 +2,7 @@
 
 A testing and demo server that implements the Bitfocus Companion
 [Satellite API](https://github.com/bitfocus/companion/wiki/Satellite-API), for developing satellite
-*client* apps without a Companion install.
+_client_ apps without a Companion install.
 
 It exists so a client can be:
 
@@ -14,11 +14,11 @@ Status: **design only**. Nothing is implemented yet.
 
 ## Documentation
 
-| Doc | Contents |
-|---|---|
-| [`docs/protocol.md`](docs/protocol.md) | Implementation notes that complement the [official spec](https://companion.free/for-developers/Satellite-API): wire quirks, exact bounds and error strings, liveness timing, and the version→capability matrix. |
-| [`docs/design.md`](docs/design.md) | System design: pairing workflow, architecture, demo scenarios, test tooling, security model. |
-| [`docs/implementation-plan.md`](docs/implementation-plan.md) | Phased build order with deliverables and acceptance criteria. |
+| Doc                                                          | Contents                                                                                                                                                                                                        |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`docs/protocol.md`](docs/protocol.md)                       | Implementation notes that complement the [official spec](https://companion.free/for-developers/Satellite-API): wire quirks, exact bounds and error strings, liveness timing, and the version→capability matrix. |
+| [`docs/design.md`](docs/design.md)                           | System design: pairing workflow, architecture, demo scenarios, test tooling, security model.                                                                                                                    |
+| [`docs/implementation-plan.md`](docs/implementation-plan.md) | Phased build order with deliverables and acceptance criteria.                                                                                                                                                   |
 
 ## Shape of the thing
 

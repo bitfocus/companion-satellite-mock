@@ -4,7 +4,7 @@
 (source: [`bitfocus/website/for-developers/Satellite-API.md`](https://github.com/bitfocus/website/blob/main/for-developers/Satellite-API.md)).
 It is current, complete and covers API 1.14. Read it for the protocol; do not duplicate it here.
 
-This file holds only what the spec reasonably leaves out but a *server* reimplementation must match:
+This file holds only what the spec reasonably leaves out but a _server_ reimplementation must match:
 wire quirks, exact bounds, exact error strings, liveness timing, and the version→capability matrix
 the mock's version knob is built on. Read out of the Companion source at commit
 [`3d76cba`](https://github.com/bitfocus/companion/commit/3d76cbadedab21d5dc7e14d3b332557248513b1a)
@@ -39,10 +39,10 @@ Each of these is a test case in `packages/protocol`.
 6. **A fragment with no `=` becomes `true`** (a bare flag).
 7. **Booleans are always emitted as `1`/`0`**, and accepted as `true`/`false`/`1`/`0`.
 8. **`PING`'s payload is the raw unparsed remainder of the line**, echoed as-is into `PONG`.
-9. **`Device exists elsewhere` is sent to the *existing* socket**, not to the one that asked. The
+9. **`Device exists elsewhere` is sent to the _existing_ socket**, not to the one that asked. The
    requesting socket gets no reply at all.
 10. **`Line too long` is emitted as `ERROR ERROR MESSAGE="Line too long"`** — `messageName` is
-    `'ERROR'` *and* the status is `'ERROR'`.
+    `'ERROR'` _and_ the status is `'ERROR'`.
 11. **`BITMAPS=1`, any non-numeric truthy value, or a number `<5` all mean 72 px.**
 12. **`FONT_SIZE` may be the literal string `auto`**, not just a number.
 13. **`LEDS` ignores the negotiated `BITMAP_FORMAT`** — always raw RGB, never a data URL.
@@ -56,17 +56,17 @@ Each of these is a test case in `packages/protocol`.
 
 ## 2. Bounds
 
-| Thing | Upstream value | Constant |
-|---|---|---|
-| Receive buffer / max line | 2 MB, then `Line too long` + destroy | `MAX_LINE_LENGTH` |
-| `KEYS_TOTAL` | 1 … 2000 | `MAX_KEYS_TOTAL` |
-| `KEYS_PER_ROW` | 1 … 1000 | `MAX_KEYS_PER_ROW` |
-| `SUBID` charset | `/^[a-zA-Z0-9\-/]+$/` | — |
-| Control id charset | `/^[a-zA-Z0-9\-/]+$/` | — |
-| `LOCATION` | `/^(\d+)\/(\d+)\/(\d+)$/` | — |
-| `PINCODE-KEY` `KEY` | 0 … 9 | — |
-| LED `segments` | 1 … 200 | schema |
-| Reserved id prefixes | `emulator:`, `group:` rejected for `DEVICEID` and `SERIAL` | — |
+| Thing                     | Upstream value                                             | Constant           |
+| ------------------------- | ---------------------------------------------------------- | ------------------ |
+| Receive buffer / max line | 2 MB, then `Line too long` + destroy                       | `MAX_LINE_LENGTH`  |
+| `KEYS_TOTAL`              | 1 … 2000                                                   | `MAX_KEYS_TOTAL`   |
+| `KEYS_PER_ROW`            | 1 … 1000                                                   | `MAX_KEYS_PER_ROW` |
+| `SUBID` charset           | `/^[a-zA-Z0-9\-/]+$/`                                      | —                  |
+| Control id charset        | `/^[a-zA-Z0-9\-/]+$/`                                      | —                  |
+| `LOCATION`                | `/^(\d+)\/(\d+)\/(\d+)$/`                                  | —                  |
+| `PINCODE-KEY` `KEY`       | 0 … 9                                                      | —                  |
+| LED `segments`            | 1 … 200                                                    | schema             |
+| Reserved id prefixes      | `emulator:`, `group:` rejected for `DEVICEID` and `SERIAL` | —                  |
 
 The mock deliberately tightens some of these (see [design.md §9.2](./design.md#92-limits)) with a
 knob to restore upstream values for compatibility testing.
@@ -86,28 +86,28 @@ Stable, and worth asserting on verbatim:
 
 ## 4. Liveness
 
-| | Value |
-|---|---|
-| TCP idle timeout | `socket.setTimeout(5000)` → `destroy()` |
-| WebSocket idle timeout | 3 s interval, `terminate()` if >5 s since last inbound frame |
-| Reference client ping interval | **100 ms** |
-| Reference client tolerance | 15 unacked pings, with a 1 s "recently heard from" allowance |
+|                                | Value                                                        |
+| ------------------------------ | ------------------------------------------------------------ |
+| TCP idle timeout               | `socket.setTimeout(5000)` → `destroy()`                      |
+| WebSocket idle timeout         | 3 s interval, `terminate()` if >5 s since last inbound frame |
+| Reference client ping interval | **100 ms**                                                   |
+| Reference client tolerance     | 15 unacked pings, with a 1 s "recently heard from" allowance |
 
 The spec recommends pinging every 2 s; the real client pings at 10 Hz. **Rate limits must be tuned
 against the real client, not the recommendation.**
 
-The WebSocket transport is *not* message-per-frame: Companion appends frame text to a receive buffer
+The WebSocket transport is _not_ message-per-frame: Companion appends frame text to a receive buffer
 and splits on `\n`. Companion happens to write one line per frame, but that is not a guarantee — which
 is exactly why the mock's framing chaos tool (split/coalesce) is high value.
 
 ## 5. Behaviours the spec states loosely
 
-- **`CAPS` exists only from 1.10.0.** Per the spec, clients should decide whether a feature *exists*
+- **`CAPS` exists only from 1.10.0.** Per the spec, clients should decide whether a feature _exists_
   from `ApiVersion`, and consult `CAPS` only for features that may be conditionally disabled within a
   version that supports them. The mock's version profiles must honour that split.
 - **Toggling a capability closes connections.** Upstream force-closes every satellite socket when
   `satellite_subscriptions_enabled` changes, so clients reconnect and re-read `CAPS`. The mock's
-  *Apply & bounce* does the same thing and is therefore realistic, not a contrivance.
+  _Apply & bounce_ does the same thing and is therefore realistic, not a contrivance.
 - **`DEVICE-CONFIG` is pushed once immediately after `ADD-DEVICE OK`** (when `CONFIG_FIELDS` were
   declared), then again on every change.
 - **`VARIABLE-VALUE` is debounced** upstream (5 ms, max 20 ms) and only sent when the value actually
@@ -121,33 +121,33 @@ is exactly why the mock's framing chaos tool (split/coalesce) is high value.
 - **`CHANGE-PAGE` is silently ignored** when the user has disabled page changes for the surface —
   Companion always answers `OK`.
 - **`FIRMWARE-UPDATE-INFO` produces nothing on the wire but the `OK`.** Companion just shows an
-  indicator in its own UI. The mock's web UI is therefore the *only* place a client author can
+  indicator in its own UI. The mock's web UI is therefore the _only_ place a client author can
   confirm it was sent correctly, so it must be reported there prominently.
 
 ## 6. Version → capability matrix
 
 Drives `ApiVersionProfile` and the version knob. Companion-version column is from the spec.
 
-| API | Companion | Gate this in the profile |
-|---|---|---|
-| 1.0.0 | — | baseline |
-| 1.1.0 | — | `KEY-STATE` gains `TYPE`, `PRESSED` |
-| 1.2.0 | — | `DEVICEID` included on errors |
-| 1.3.0 | — | `KEY-ROTATE` accepted |
-| 1.4.0 | v3.0+ | `TEXT_STYLE` flag, `FONT_SIZE` arg |
-| 1.5.0 | v3.2+ | `BITMAPS` as a pixel size |
-| 1.5.1 | — | grid size limits lifted |
-| 1.6.0 | — | `row/column` key notation; `TEXTCOLOR`; `COLORS` format choice; >32 keys |
-| 1.7.0 | v3.4+ | `VARIABLES`/`SET-VARIABLE-VALUE`/`VARIABLE-VALUE`; `BRIGHTNESS` opt-out |
-| 1.7.1 | — | `VARIABLE` echoed in the `SET-VARIABLE-VALUE OK` |
-| 1.8.0 | v4.0+ | `PINCODE_LOCK`, `PINCODE-KEY`, `LOCKED-STATE` |
-| 1.9.0 | v4.2+ | `LAYOUT_MANIFEST`, `CONTROLID` addressing |
-| 1.10.0 | v4.3+ | `CAPS`; subscriptions; `LOCATION`; `SERIAL`/`SERIAL_IS_UNIQUE`; `CONFIG_FIELDS`/`DEVICE-CONFIG`; `CAN_CHANGE_PAGE`/`CHANGE-PAGE`; `FIRMWARE-UPDATE-INFO` |
-| 1.10.1 | — | `ROTATION` on `LOCKED-STATE` |
-| 1.11.0 | v5.0+ | `NONSQUARE` in `CAPS` |
-| 1.12.0 | v5.0+ | `BITMAP_FORMATS` in `CAPS`, `BITMAP_FORMAT` on `ADD-DEVICE`/`ADD-SUB` |
-| 1.13.0 | v5.1+ | `leds` style preset, `LEDS` arg (no `CAPS` flag — gated on `ApiVersion` alone) |
-| 1.14.0 | v5.1+ | signed multi-step `DIRECTION`, `ROTARY_AMOUNT` in `CAPS` |
+| API    | Companion | Gate this in the profile                                                                                                                                 |
+| ------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0  | —         | baseline                                                                                                                                                 |
+| 1.1.0  | —         | `KEY-STATE` gains `TYPE`, `PRESSED`                                                                                                                      |
+| 1.2.0  | —         | `DEVICEID` included on errors                                                                                                                            |
+| 1.3.0  | —         | `KEY-ROTATE` accepted                                                                                                                                    |
+| 1.4.0  | v3.0+     | `TEXT_STYLE` flag, `FONT_SIZE` arg                                                                                                                       |
+| 1.5.0  | v3.2+     | `BITMAPS` as a pixel size                                                                                                                                |
+| 1.5.1  | —         | grid size limits lifted                                                                                                                                  |
+| 1.6.0  | —         | `row/column` key notation; `TEXTCOLOR`; `COLORS` format choice; >32 keys                                                                                 |
+| 1.7.0  | v3.4+     | `VARIABLES`/`SET-VARIABLE-VALUE`/`VARIABLE-VALUE`; `BRIGHTNESS` opt-out                                                                                  |
+| 1.7.1  | —         | `VARIABLE` echoed in the `SET-VARIABLE-VALUE OK`                                                                                                         |
+| 1.8.0  | v4.0+     | `PINCODE_LOCK`, `PINCODE-KEY`, `LOCKED-STATE`                                                                                                            |
+| 1.9.0  | v4.2+     | `LAYOUT_MANIFEST`, `CONTROLID` addressing                                                                                                                |
+| 1.10.0 | v4.3+     | `CAPS`; subscriptions; `LOCATION`; `SERIAL`/`SERIAL_IS_UNIQUE`; `CONFIG_FIELDS`/`DEVICE-CONFIG`; `CAN_CHANGE_PAGE`/`CHANGE-PAGE`; `FIRMWARE-UPDATE-INFO` |
+| 1.10.1 | —         | `ROTATION` on `LOCKED-STATE`                                                                                                                             |
+| 1.11.0 | v5.0+     | `NONSQUARE` in `CAPS`                                                                                                                                    |
+| 1.12.0 | v5.0+     | `BITMAP_FORMATS` in `CAPS`, `BITMAP_FORMAT` on `ADD-DEVICE`/`ADD-SUB`                                                                                    |
+| 1.13.0 | v5.1+     | `leds` style preset, `LEDS` arg (no `CAPS` flag — gated on `ApiVersion` alone)                                                                           |
+| 1.14.0 | v5.1+     | signed multi-step `DIRECTION`, `ROTARY_AMOUNT` in `CAPS`                                                                                                 |
 
 Selecting an API version in the UI must therefore change real behaviour: at 1.6.0 the mock sends no
 `CAPS` at all, no `LOCATION`, no `LEDS`, rejects `ADD-SUB`, streams `rgb` only, and clamps rotation

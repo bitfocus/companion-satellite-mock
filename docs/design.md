@@ -1,7 +1,7 @@
 # companion-satellite-mock — system design
 
 A test/demo server that speaks Bitfocus Companion's [Satellite API](./protocol.md) so that a
-satellite *client* can be developed, exercised and demonstrated without a real
+satellite _client_ can be developed, exercised and demonstrated without a real
 Companion install — including by someone who will never open the web UI.
 
 ## 1. Goals
@@ -19,23 +19,23 @@ Companion install — including by someone who will never open the web UI.
 - Not a Companion replacement. No modules, actions, feedbacks, expression engine, or real pages.
 - No persistence. Restart = clean slate; clients rebuild their sessions on reconnect.
 - No user accounts, no session confidentiality (explicitly out of scope — obscurity is enough).
-- TCP transport is *designed for* but not shipped in v1.
+- TCP transport is _designed for_ but not shipped in v1.
 
 ## 3. Decisions
 
-| Decision | Choice |
-|---|---|
-| Runtime | Node 26, TypeScript (ESM, strict), yarn 4 workspaces |
-| HTTP/API | Express 5 + `ws`; tRPC v11 over a WebSocket link for the UI |
-| Web UI | React + Vite + tRPC client |
-| Rendering | `@napi-rs/canvas` for drawing **and** PNG/WebP encoding |
-| Pairing | Claim-by-device-id (see §4) — transport-agnostic, works for TCP later |
-| Transports | WebSocket only in v1; transport abstraction present from day one |
-| Unclaimed clients | Auto-attach a live demo surface that displays its unclaimed state + claim code |
-| State | All in memory |
-| Deployment | Docker image behind a TLS reverse proxy |
-| Access | Public, unauthenticated, hardened and rate limited |
-| Test tools | Protocol/version knobs, connection chaos, bounded load. Malformed-input suite deferred |
+| Decision          | Choice                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| Runtime           | Node 26, TypeScript (ESM, strict), yarn 4 workspaces                                   |
+| HTTP/API          | Express 5 + `ws`; tRPC v11 over a WebSocket link for the UI                            |
+| Web UI            | React + Vite + tRPC client                                                             |
+| Rendering         | `@napi-rs/canvas` for drawing **and** PNG/WebP encoding                                |
+| Pairing           | Claim-by-device-id (see §4) — transport-agnostic, works for TCP later                  |
+| Transports        | WebSocket only in v1; transport abstraction present from day one                       |
+| Unclaimed clients | Auto-attach a live demo surface that displays its unclaimed state + claim code         |
+| State             | All in memory                                                                          |
+| Deployment        | Docker image behind a TLS reverse proxy                                                |
+| Access            | Public, unauthenticated, hardened and rate limited                                     |
+| Test tools        | Protocol/version knobs, connection chaos, bounded load. Malformed-input suite deferred |
 
 ## 4. Workflow
 
@@ -68,12 +68,12 @@ see a working, interactive, self-explanatory surface.
 
 ### 4.3 Session identity and continuity
 
-- A **session** corresponds to one *connection*, keyed for continuity by its **primary device id**
+- A **session** corresponds to one _connection_, keyed for continuity by its **primary device id**
   (the first `ADD-DEVICE` on that connection).
 - Reconnecting with the same primary device id rebinds to the existing session within a grace
   window, restoring its scenario, chaos settings, protocol profile and claim — so the claim survives
   a reconnect and the surface does not bounce back to Unclaimed. The target is gaps of a minute or
-  less (app backgrounded, network flap, an *Apply & bounce* version change); the default window is
+  less (app backgrounded, network flap, an _Apply & bounce_ version change); the default window is
   10 min, which is generous for that and still cheap, since a session is a few KB of memory and a
   ring buffer. Nothing is persisted — a server restart legitimately drops everything, and clients
   reconnect into fresh Unclaimed sessions.
@@ -86,7 +86,7 @@ see a working, interactive, self-explanatory surface.
   contains device ids and payloads — requires the code. There is no public browsable list.
 - Explicit unclaim, controller idle timeout, or session expiry returns the surface to Unclaimed and
   re-draws a fresh code.
-- **A subscribed browser keeps the session alive too.** The GC window starts only once *both* ends
+- **A subscribed browser keeps the session alive too.** The GC window starts only once _both_ ends
   are gone: the satellite connection has dropped **and** no controller is actively subscribed. So a
   client that vanishes while the operator still has the tab open keeps its claim, scenario, chaos
   settings and trace indefinitely — the UI just shows the device as offline, which is the behaviour
@@ -179,17 +179,18 @@ knowing.
 
 - **Encoders:** raw RGB (`w*h*3`, base64) for `rgb`; `canvas.encode('png'|'webp')` wrapped in a
   `data:` URL for the others. Format follows the per-device/per-subscription negotiation.
+
 ### Measured (Phase 0 spike, Node 26.7.0 / `@napi-rs/canvas` / x64)
 
 The spike ran before any design was committed to; the numbers moved two decisions.
 
-| Operation (72×72 button) | ms/op |
-|---|---|
-| draw only | 0.068 |
-| `getImageData()` + naive RGBA→RGB loop | ~1.14 |
-| **`canvas.data()` + tight indexed loop** | **0.144** |
-| `toBuffer('image/png')` | 0.42 |
-| `toBuffer('image/webp')` | 0.66 |
+| Operation (72×72 button)                          | ms/op                     |
+| ------------------------------------------------- | ------------------------- |
+| draw only                                         | 0.068                     |
+| `getImageData()` + naive RGBA→RGB loop            | ~1.14                     |
+| **`canvas.data()` + tight indexed loop**          | **0.144**                 |
+| `toBuffer('image/png')`                           | 0.42                      |
+| `toBuffer('image/webp')`                          | 0.66                      |
 | Full unique 32-key surface, draw + rgb, fast path | **12.0** (was 43.6 naive) |
 
 Payloads for that button: `rgb` 15552 B, `png` 1155 B, `webp` 1168 B.
@@ -200,12 +201,12 @@ Three conclusions:
    with explicit indexing (`out[o]=…; o+=3`) rather than `o++` per channel, which is a further 3.4×.
    Together they take a cold full-surface redraw from 44 ms to 12 ms, comfortably inside a 30 fps
    frame even with every button unique.
-2. **`canvas.data()` returns *premultiplied* RGBA; `getImageData()` does not.** A 50%-alpha white
+2. **`canvas.data()` returns _premultiplied_ RGBA; `getImageData()` does not.** A 50%-alpha white
    pixel is `7f7f7f7f` from `data()` and `ffffff7f` from `getImageData()`. Buttons are always drawn
    over an opaque background fill, so alpha is 255 everywhere and the two agree — but that must be an
    enforced invariant of the renderer (assert opacity in dev builds), not an accident, or
    transparency silently darkens.
-3. **PNG is cheaper than raw RGB *and* 13× smaller on the wire** — the encode costs less than the
+3. **PNG is cheaper than raw RGB _and_ 13× smaller on the wire** — the encode costs less than the
    RGBA→RGB conversion it replaces. So `png` is the preferred format to negotiate whenever a client
    can decode it, and `rgb` is the compatibility path rather than the fast path. Worth telling client
    authors.
@@ -233,8 +234,8 @@ interface Scenario {
   id: string
   name: string
   description: string
-  requires?: ScenarioFeature[]        // e.g. 'bitmaps', 'leds', 'variables', 'pincode'
-  params?: ZodSchema                  // rendered as a form in the web UI
+  requires?: ScenarioFeature[] // e.g. 'bitmaps', 'leds', 'variables', 'pincode'
+  params?: ZodSchema // rendered as a form in the web UI
   init(ctx: ScenarioContext): void
   onPress?(ctx, controlId, pressed): void
   onRotate?(ctx, controlId, delta): void
@@ -255,21 +256,21 @@ shows which features the connected client actually negotiated, and greys out wha
 
 ### The catalogue
 
-| # | Scenario | What it demonstrates / tests |
-|---|---|---|
-| 1 | **Unclaimed** (auto) | Claim code + liveness. Press/rotate feedback. The zero-interaction surface. |
-| 2 | **Companion Home** | A believable Companion page: `PAGEUP`/`PAGEDOWN`/`PAGENUM` buttons, realistic labels (`CAM 1`, `ATEM PGM`), `LOCATION` set, press latching, page navigation via `CHANGE-PAGE`. The screenshot/demo-video scenario. |
-| 3 | **Input echo** | The surface displays what the server received: last key index *and* how it was interpreted (flat index vs `row/col`), press/release timing, rotation deltas. The single best tool for verifying a client's input mapping. |
-| 4 | **Colour & text matrix** | Every button a different colour; text with unicode, emoji, RTL, very long strings, embedded newlines; `FONT_SIZE` numeric and `auto`; both `hex` and `rgb` colour formats. |
-| 5 | **Bitmap torture** | Gradients, 1px checkerboards, numbered corner markers, orientation arrows, per-control differing sizes, non-square controls, format sweep (rgb / png / webp). Catches scaling, orientation, stride and decode bugs. |
-| 6 | **Encoder lab** | Encoders with LED rings: draws a gauge, emits `LEDS`, and prints the raw received `DIRECTION` so 1.14 multi-step rotation can be verified against ±1 legacy behaviour. |
-| 7 | **Pincode lock** | Drives `LOCKED-STATE` with `CHARACTER_COUNT` and `ROTATION`; validates `PINCODE-KEY` in `FULL` mode; a correct PIN unlocks. Also exercises the "no drawing while locked" rule. |
-| 8 | **Brightness** | Ramps, steps and extremes of `BRIGHTNESS`; honours a client that opted out with `BRIGHTNESS=0`. |
-| 9 | **Variables** | Streams `VARIABLE-VALUE` for the output variables the client declared (clock, counter, random, long string); shows inbound `SET-VARIABLE-VALUE` in the UI. |
-| 10 | **Device config** | Renders the client's `CONFIG_FIELDS` as a real form in the web UI (same field schema Companion uses) and pushes `DEVICE-CONFIG` on change. |
-| 11 | **Subscriptions** | For clients using `ADD-SUB`: a virtual page grid in the UI whose cells can be edited, streaming `SUB-STATE` to matching subscriptions. |
-| 12 | **Attract / animation** | A slow, pretty animation (plasma, marquee, clock) at a capped frame rate — for the demo video and for an unattended demo instance. |
-| 13 | **Stress** | The bounded load tool (§8.3), presented as a scenario. |
+| #   | Scenario                 | What it demonstrates / tests                                                                                                                                                                                              |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Unclaimed** (auto)     | Claim code + liveness. Press/rotate feedback. The zero-interaction surface.                                                                                                                                                 |
+| 2   | **Companion Home**       | A believable Companion page: `PAGEUP`/`PAGEDOWN`/`PAGENUM` buttons, realistic labels (`CAM 1`, `ATEM PGM`), `LOCATION` set, press latching, page navigation via `CHANGE-PAGE`. The screenshot/demo-video scenario.        |
+| 3   | **Input echo**           | The surface displays what the server received: last key index _and_ how it was interpreted (flat index vs `row/col`), press/release timing, rotation deltas. The single best tool for verifying a client's input mapping. |
+| 4   | **Colour & text matrix** | Every button a different colour; text with unicode, emoji, RTL, very long strings, embedded newlines; `FONT_SIZE` numeric and `auto`; both `hex` and `rgb` colour formats.                                                |
+| 5   | **Bitmap torture**       | Gradients, 1px checkerboards, numbered corner markers, orientation arrows, per-control differing sizes, non-square controls, format sweep (rgb / png / webp). Catches scaling, orientation, stride and decode bugs.       |
+| 6   | **Encoder lab**          | Encoders with LED rings: draws a gauge, emits `LEDS`, and prints the raw received `DIRECTION` so 1.14 multi-step rotation can be verified against ±1 legacy behaviour.                                                    |
+| 7   | **Pincode lock**         | Drives `LOCKED-STATE` with `CHARACTER_COUNT` and `ROTATION`; validates `PINCODE-KEY` in `FULL` mode; a correct PIN unlocks. Also exercises the "no drawing while locked" rule.                                            |
+| 8   | **Brightness**           | Ramps, steps and extremes of `BRIGHTNESS`; honours a client that opted out with `BRIGHTNESS=0`.                                                                                                                           |
+| 9   | **Variables**            | Streams `VARIABLE-VALUE` for the output variables the client declared (clock, counter, random, long string); shows inbound `SET-VARIABLE-VALUE` in the UI.                                                                |
+| 10  | **Device config**        | Renders the client's `CONFIG_FIELDS` as a real form in the web UI (same field schema Companion uses) and pushes `DEVICE-CONFIG` on change.                                                                                |
+| 11  | **Subscriptions**        | For clients using `ADD-SUB`: a virtual page grid in the UI whose cells can be edited, streaming `SUB-STATE` to matching subscriptions.                                                                                    |
+| 12  | **Attract / animation**  | A slow, pretty animation (plasma, marquee, clock) at a capped frame rate — for the demo video and for an unattended demo instance.                                                                              |
+| 13  | **Stress**               | The bounded load tool (§8.3), presented as a scenario.                                                                                                                                                                    |
 
 ## 8. Web UI
 
@@ -280,7 +281,7 @@ shows which features the connected client actually negotiated, and greys out wha
 - **Session** — the working view, once claimed:
   - **Surface mirror**: the grid the server believes it sent, tile per control, showing the rendered
     bitmap (as a PNG data URL), colour swatches, text, font size, pressed state and LEDs, with a
-    "last drawn" timestamp and a flash on update. *This is the alignment tool* — put it next to the
+    "last drawn" timestamp and a flash on update. _This is the alignment tool_ — put it next to the
     client's own screen and differences are obvious.
   - **Input log**: presses/rotations/pincode/variables from the client, with the resolved control and
     the raw parameters.
@@ -299,7 +300,7 @@ shows which features the connected client actually negotiated, and greys out wha
 ### 8.2 Protocol & version knobs
 
 Because `BEGIN`/`CAPS` are sent at connect time, changing the advertised version can't apply to a
-live connection. The UI therefore edits a **pending profile** and offers *Apply & bounce* — which
+live connection. The UI therefore edits a **pending profile** and offers _Apply & bounce_ — which
 sets the profile and then drops the connection so the client reconnects into it. (That doubles as a
 reconnect test.)
 
@@ -337,7 +338,7 @@ All of these apply only to the session the acting browser has claimed, and all h
 
 ### 8.4 Load / throughput (bounded)
 
-> Caveat shown in the UI: this mostly measures the *server* and the network, not the device — and
+> Caveat shown in the UI: this mostly measures the _server_ and the network, not the device — and
 > the render cache means the server barely notices. Its real use is finding a client's decode and
 > render ceiling, so it's built as a **payload sweep** rather than a raw flood.
 
@@ -354,7 +355,7 @@ deferred malformed-input tooling by hand. Length-capped (4 KB) and rate limited.
 ## 9. Security and abuse resistance
 
 Threat model: anyone on the internet can open WebSocket connections and load the UI. The assets are
-server CPU, memory, bandwidth, and the availability of the demo. Session *contents* are explicitly
+server CPU, memory, bandwidth, and the availability of the demo. Session _contents_ are explicitly
 not protected.
 
 ### 9.1 The two structural properties
@@ -365,34 +366,34 @@ and displayed as inert, non-clickable text and never fetched. Enforce it as an i
 client dependency in `packages/server`, and a lint rule/test asserting that.
 
 **Relaying is confined to one session's two parties.** Data flows client → its own session → its
-controller browser and back, and those two are on different IPs by design, so this *is* a
+controller browser and back, and those two are on different IPs by design, so this _is_ a
 cross-network relay of a limited kind — the trace carries what the client sent to the browser, and
 the raw sender carries browser-composed lines to the client. It is not worth pretending otherwise.
 What makes it unattractive rather than impossible: both ends must share a claim code, a session
 carries no storage and dies minutes after disconnect, only one browser controls a session at a time,
 and both directions sit under the size and rate caps in §9.2 (the raw sender is capped at 4 KB per
-line and rate limited). Nothing a client sends ever reaches a *different* session, so it cannot be
+line and rate limited). Nothing a client sends ever reaches a _different_ session, so it cannot be
 used as a broadcast relay, file drop or CDN. Anyone wanting a data channel between two hosts has far
 better options; the mitigation here is the caps, not a claim of impossibility.
 
 ### 9.2 Limits
 
-| Scope | Limit (default) |
-|---|---|
-| Line length | 256 KB (Companion allows 2 MB; raisable via a knob for compatibility testing) |
-| Inbound rate | 200 msg/s and 512 KB/s per connection, token bucket. Must comfortably fit the reference client's 10 Hz ping. |
-| Devices per connection | 4 |
-| Subscriptions per connection | 64 |
-| Grid | `KEYS_TOTAL` ≤ 2000, `KEYS_PER_ROW` ≤ 1000 (mirrors upstream), but ≤ 512 *rendered* controls |
-| Declared variables / config fields | 32 each |
-| Decoded manifest / config JSON | 256 KB before parse, schema-validated after |
-| Bitmap request | ≤ 512×512, ≤ 4 MB/s of pixel output per session |
-| Concurrent connections | 5 per IP (IPv6 bucketed by /64), 500 server-wide |
-| New connections | 30/min per IP, burst 10 |
-| Claim attempts | 5/min per IP with backoff; constant-time compare; codes expire |
-| Outbound queue | Bounded bytes per connection; latest-wins coalescing per control (as Companion's `ImageWriteQueue` does); terminate on overflow rather than buffering |
-| Session lifetime | Idle disconnect 5 s (protocol); session GC 10 min after *both* the client disconnects and the last controller unsubscribes; ≤4 held sessions per UI client; absolute session and connection cap 12 h |
-| Trace buffer | 2000 lines/session, payloads elided |
+| Scope                              | Limit (default)                                                                                                                                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Line length                        | 256 KB (Companion allows 2 MB; raisable via a knob for compatibility testing)                                                                                                                        |
+| Inbound rate                       | 200 msg/s and 512 KB/s per connection, token bucket. Must comfortably fit the reference client's 10 Hz ping.                                                                                         |
+| Devices per connection             | 4                                                                                                                                                                                                    |
+| Subscriptions per connection       | 64                                                                                                                                                                                                   |
+| Grid                               | `KEYS_TOTAL` ≤ 2000, `KEYS_PER_ROW` ≤ 1000 (mirrors upstream), but ≤ 512 _rendered_ controls                                                                                                         |
+| Declared variables / config fields | 32 each                                                                                                                                                                                              |
+| Decoded manifest / config JSON     | 256 KB before parse, schema-validated after                                                                                                                                                          |
+| Bitmap request                     | ≤ 512×512, ≤ 4 MB/s of pixel output per session                                                                                                                                                      |
+| Concurrent connections             | 5 per IP (IPv6 bucketed by /64), 500 server-wide                                                                                                                                                     |
+| New connections                    | 30/min per IP, burst 10                                                                                                                                                                              |
+| Claim attempts                     | 5/min per IP with backoff; constant-time compare; codes expire                                                                                                                                       |
+| Outbound queue                     | Bounded bytes per connection; latest-wins coalescing per control (as Companion's `ImageWriteQueue` does); terminate on overflow rather than buffering                                                |
+| Session lifetime                   | Idle disconnect 5 s (protocol); session GC 10 min after _both_ the client disconnects and the last controller unsubscribes; ≤4 held sessions per UI client; absolute session and connection cap 12 h |
+| Trace buffer                       | 2000 lines/session, payloads elided                                                                                                                                                                  |
 
 ### 9.3 Web layer
 
@@ -401,9 +402,9 @@ better options; the mitigation here is the caps, not a claim of impossibility.
   configured public origin).
 - Strict CSP, `helmet`-style headers, no CORS, no cookies beyond an opaque UI client id, no uploads,
   small body limits, static assets served immutably.
-- Every tRPC input validated with zod; mutations rate limited per UI client id *and* per IP.
+- Every tRPC input validated with zod; mutations rate limited per UI client id _and_ per IP.
 - Never `eval`, never build filesystem paths from input, `Object.create(null)` + banned prototype
-  keys in the parser, base64 size-checked *before* decode, JSON parsed under a size cap and then
+  keys in the parser, base64 size-checked _before_ decode, JSON parsed under a size cap and then
   schema-validated.
 
 ### 9.4 Privacy on a shared instance
@@ -433,7 +434,7 @@ logs and in the admin view are shown hashed (`ip:ab12cd`). Full session detail r
 - **Ping rate vs rate limits.** The reference client pings at 10 Hz. Any limit tuning must be tested
   against a real client, not a synthetic one.
 - **Unattended-demo dependency.** The demo must work with no interaction and survive a restart. In-memory
-  state is fine because clients reconnect and rebuild, but the *instance* must be up — so
+  state is fine because clients reconnect and rebuild, but the _instance_ must be up — so
   healthchecks, restart policy and a smoke test that connects a headless client are part of the deploy.
 
 ## 11. Deferred

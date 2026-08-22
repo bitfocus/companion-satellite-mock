@@ -1,0 +1,26 @@
+{
+  "name": "@satellite-mock/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "node --watch --experimental-strip-types src/main.ts",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
+    "@satellite-mock/protocol": "workspace:*",
+    "@trpc/server": "^11.5.0",
+    "express": "^5.1.0",
+    "pino": "^9.9.0",
+    "ws": "^8.18.3",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/ws": "^8.18.1",
+    "typescript": "~5.9.2"
+  }
+}

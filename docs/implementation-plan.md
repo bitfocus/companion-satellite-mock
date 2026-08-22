@@ -8,9 +8,9 @@ Estimates are relative sizes (S/M/L), not calendar time.
 
 ---
 
-## Phase 0 — Scaffolding and de-risking (M)
+## Phase 0 — Scaffolding and de-risking (M) — ✅ done
 
-**Do first, because it de-risks the one native dependency.**
+**Done first, because it de-risks the one native dependency.**
 
 1. Repo layout: yarn 4 workspaces — `packages/protocol`, `packages/server`, `packages/webui`,
    `packages/testclient`.
@@ -28,6 +28,14 @@ Estimates are relative sizes (S/M/L), not calendar time.
 
 **Done when:** `yarn build && yarn test` is green in CI and the container starts and renders a PNG
 button on the target architecture.
+
+**Outcome.** `yarn check` (format, lint, typecheck, test) and the webui build are green on Node
+26.7.0 with Yarn 4.10.3. Two design invariants are enforced by lint rather than by good intentions,
+and both were verified to fire: `packages/protocol` may not import anything that does I/O, and
+`packages/server` may not use `fetch` or an HTTP client library (see
+[design.md §9.1](./design.md#91-the-two-structural-properties)). Yarn is vendored at
+`.yarn/releases/` rather than fetched by corepack, so CI and the Docker build are reproducible and
+need no network beyond the registry. Container build and arm64 confirmation are still outstanding.
 
 ---
 
@@ -79,7 +87,7 @@ after 5 s of silence, and the caps are demonstrably enforced by a small abuse sc
 
 1. `ADD-DEVICE`: full validation and error paths, both legacy and manifest registration, normalised
    into the internal `Surface` model. `REMOVE-DEVICE`, `QUIT`.
-2. Reserved-prefix rules, duplicate handling (including the "error goes to the *existing* socket"
+2. Reserved-prefix rules, duplicate handling (including the "error goes to the _existing_ socket"
    quirk), multiple devices per connection.
 3. `KEY-PRESS`, `KEY-ROTATE`, `PINCODE-KEY`, `SET-VARIABLE-VALUE`, `CHANGE-PAGE`,
    `FIRMWARE-UPDATE-INFO` (store as inert text; the only wire effect is the `OK`, so the web UI must report it), `ADD-SUB`/`REMOVE-SUB`/`SUB-PRESS`/`SUB-ROTATE`.
@@ -103,7 +111,7 @@ error paths return upstream's exact strings, and disconnect/reconnect restores t
    per-session pixel-rate ceiling; dimension caps enforced at `ADD-DEVICE` time.
 5. Benchmarks for cold and warm render paths, checked into the repo.
 
-**Done when:** a full 32-key surface of *unique* content renders cold in ≤15 ms (the spike measured
+**Done when:** a full 32-key surface of _unique_ content renders cold in ≤15 ms (the spike measured
 12 ms, so this is a regression guard rather than a target), and the cache hit rate on a repeating
 animation is >95%.
 
@@ -125,17 +133,20 @@ client shows buttons and reports presses.
 ## Phase 6 — Test client and scenario engine (L)
 
 ### 6a — `packages/testclient` (S, pull earlier if useful)
+
 A headless satellite client built on `packages/protocol`: connects, registers a configurable surface,
 logs everything, can send scripted input. Used by integration tests and as a manual probe. Build this
 as soon as Phase 2 lands if it speeds up development.
 
 ### 6b — Scenario engine (M)
+
 1. `Scenario` interface and `ScenarioContext` as in [design.md §7](./design.md#7-demo-modes-scenarios).
 2. Single shared tick timer for all sessions with a global work budget.
 3. Feature detection and graceful degradation; per-scenario zod param schemas.
 4. Scenario registry and lifecycle (attach/detach/switch, dispose cleanly).
 
 ### 6c — Scenarios, in value order (L)
+
 1. **Unclaimed** — first, it's the default and the zero-interaction path.
 2. **Input echo** — earns its keep immediately during client development.
 3. **Companion Home** — the demo/screenshot scenario.
@@ -177,11 +188,11 @@ end to end.
    split/coalesce, slow write, oversized line.
 2. Connection tools: graceful/abrupt disconnect, close codes, refuse-reconnect modes, ping
    misbehaviour, idle-timeout knob.
-3. Protocol profile switching: pending profile + *Apply & bounce*; sticky per-device overrides;
+3. Protocol profile switching: pending profile + _Apply & bounce_; sticky per-device overrides;
    server-defined named profiles selectable via `?profile=`.
 4. Hard ceilings on every knob; all tools scoped to the claimed session only.
 
-**Done when:** a client can be shown to survive (or be shown *not* to survive) one-byte-per-frame
+**Done when:** a client can be shown to survive (or be shown _not_ to survive) one-byte-per-frame
 delivery, a 1.6.0 server, and a 30 s reconnect blackout.
 
 ---
