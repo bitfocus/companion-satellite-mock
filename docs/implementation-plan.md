@@ -39,7 +39,7 @@ need no network beyond the registry. Container build and arm64 confirmation are 
 
 ---
 
-## Phase 1 — `packages/protocol` (L)
+## Phase 1 — `packages/protocol` (L) — 🚧 in progress
 
 The core asset. No I/O, no timers.
 
@@ -62,6 +62,13 @@ The core asset. No I/O, no timers.
 
 **Done when:** the package has no dependency on `node:net`/`ws`, and its test suite covers every
 quirk in [protocol.md §1](./protocol.md#1-wire-quirks) explicitly.
+
+**Progress.** Steps 1, 2 and 4 are done: the parser and serialiser are ported with every wire quirk,
+and `capabilitiesFor()` derives the version profile. 90 tests pass, including a **differential test
+against a verbatim copy of upstream's parser** over 20 000 seeded random lines — the port is proven
+equivalent rather than reviewed as equivalent, and refreshing the copy against a newer Companion
+turns any behaviour change into a test failure. Remaining: the schemas (step 3, generated from the
+published JSON schema assets), the per-message builders (step 5), and the golden corpus (step 6).
 
 ---
 
