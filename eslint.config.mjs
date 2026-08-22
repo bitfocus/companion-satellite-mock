@@ -25,7 +25,12 @@ export default tseslint.config(
 	{
 		// The protocol package must stay pure: no I/O, so that it can be unit tested in isolation and
 		// diffed against upstream. See docs/design.md §5.1.
+		//
+		// Tests are exempt: they are excluded from the build by the package's tsconfig, so they are
+		// not part of the shipped artifact, and the conformance corpus has to be read from disk.
+		// The invariant is about what gets built, not about what exercises it.
 		files: ['packages/protocol/**/*.ts'],
+		ignores: ['packages/protocol/**/*.test.ts'],
 		rules: {
 			'no-restricted-imports': [
 				'error',
