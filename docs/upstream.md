@@ -67,6 +67,9 @@ it, and it is not published anywhere.
 
 ## If upstream wanted to publish a package
 
+> Written up in full in [shared-package-proposal.md](./shared-package-proposal.md), including what
+> adoption would cost each consumer and how this repo would migrate. Summary below.
+
 Worth noting the duplication is already real, and predates this repo: **Companion and
 companion-satellite each carry their own copy of `parseLineParameters`** — `companion/lib/Resources/Util.ts`
 and `satellite/src/client/parser.ts` — and they have already drifted (upstream's `BANNED_PROPS` comes
