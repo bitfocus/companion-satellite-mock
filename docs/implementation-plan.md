@@ -47,9 +47,10 @@ The core asset. No I/O, no timers.
    [protocol.md §1](./protocol.md#1-wire-quirks).
 2. `serialise` — `sendMessage` equivalent, trailing-space quirk on by default and toggleable,
    `\n`/`\r\n` selectable.
-3. Schemas: generate types for `LAYOUT_MANIFEST` and `CONFIG_FIELDS` from the published
-   `satellite-surface.schema.json` / `satellite-config-fields.schema.json` assets rather than
-   retyping them; hand-write zod for `ADD-DEVICE` params, `VARIABLES` and the inbound command shapes. Decoders that size-check base64 before decoding and JSON before parsing.
+3. Schemas: **copy Companion's two zod schema files verbatim** — they import nothing but `zod`, and
+   they are the source of truth the published JSON assets are generated from, so copying them gives
+   runtime validation rather than just types. See [upstream.md](./upstream.md). Hand-write zod for
+   `ADD-DEVICE` params, `VARIABLES` and the inbound command shapes. Decoders that size-check base64 before decoding and JSON before parsing.
 4. `ApiVersionProfile` — the version→capability table from
    [protocol.md §6](./protocol.md#6-version--capability-matrix) with `capabilitiesFor(v)`
    returning: accepted commands, permitted `KEY-STATE`/`SUB-STATE` args, `LOCATION` on/off,
@@ -63,12 +64,13 @@ The core asset. No I/O, no timers.
 **Done when:** the package has no dependency on `node:net`/`ws`, and its test suite covers every
 quirk in [protocol.md §1](./protocol.md#1-wire-quirks) explicitly.
 
-**Progress.** Steps 1, 2 and 4 are done: the parser and serialiser are ported with every wire quirk,
+**Progress.** Steps 1–4 are done: the parser and serialiser are ported with every wire quirk,
 and `capabilitiesFor()` derives the version profile. 90 tests pass, including a **differential test
 against a verbatim copy of upstream's parser** over 20 000 seeded random lines — the port is proven
 equivalent rather than reviewed as equivalent, and refreshing the copy against a newer Companion
-turns any behaviour change into a test failure. Remaining: the schemas (step 3, generated from the
-published JSON schema assets), the per-message builders (step 5), and the golden corpus (step 6).
+turns any behaviour change into a test failure. The two manifest/config-field schemas are copied
+verbatim and excluded from lint and formatting so refreshes stay clean diffs. 116 tests. Remaining:
+the per-message builders (step 5) and the golden corpus (step 6).
 
 ---
 

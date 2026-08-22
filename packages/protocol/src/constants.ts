@@ -33,12 +33,29 @@ export const ID_PATTERN = /^[a-zA-Z0-9\-/]+$/
 export const LOCATION_PATTERN = /^(\d+)\/(\d+)\/(\d+)$/
 
 /**
- * Keys dropped during parsing as a prototype-pollution guard, mirroring upstream's `BANNED_PROPS`.
- * The parsed object is null-prototype anyway, so this is belt and braces — but it also means a
- * parameter literally named `__proto__` is silently ignored rather than parsed, which is observable
- * behaviour worth matching.
+ * Keys dropped during parsing as a prototype-pollution guard.
+ *
+ * Verbatim from Companion's `BANNED_PROPS`, which lives in the published `@companion-app/expressions`
+ * package (v1.0.1, `ExpressionResolve.js`) and reaches the satellite parser via
+ * `@companion-app/shared/Expressions.js`. companion-satellite carries the same seven entries in its
+ * own copy of the parser.
+ *
+ * We inline it rather than depending on `@companion-app/expressions`, which would pull acorn,
+ * jsonpath-plus, type-fest and unicode-segmenter in for a seven-element Set — this package is meant
+ * to stay dependency-light. `bannedProps.test.ts` pins the contents so a divergence is caught.
+ *
+ * The parsed object is null-prototype anyway, so this is belt and braces — but it is also observable
+ * behaviour: a parameter literally named `__lookupGetter__` is silently dropped rather than parsed.
  */
-export const BANNED_PROPS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype'])
+export const BANNED_PROPS: ReadonlySet<string> = new Set([
+	'__proto__',
+	'constructor',
+	'prototype',
+	'__defineGetter__',
+	'__defineSetter__',
+	'__lookupGetter__',
+	'__lookupSetter__',
+])
 
 /** Bitmap encodings, in the order upstream advertises them. `rgb` is always the fallback. */
 export const BITMAP_FORMATS = ['rgb', 'png', 'webp'] as const

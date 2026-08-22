@@ -3,3 +3,6 @@ dist
 coverage
 .yarn
 yarn.lock
+
+# Copied verbatim from Companion — keep byte-identical so refreshes are clean diffs.
+packages/protocol/src/upstream

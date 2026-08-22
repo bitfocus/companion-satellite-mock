@@ -10,7 +10,18 @@ import { parseLineParameters } from './parse.js'
  * refreshing it against a newer Companion is a copy-paste and any behaviour change shows up as a
  * test failure rather than as a subtle wire difference nobody notices.
  */
-const BANNED_PROPS = new Set(['__proto__', 'constructor', 'prototype'])
+// The real set, from @companion-app/expressions v1.0.1 — NOT a restatement of ours. Sharing our
+// constant here would make the differential test blind to exactly the divergence it exists to catch,
+// which is how the first version of this port shipped with three of the seven entries.
+const BANNED_PROPS = new Set([
+	'__proto__',
+	'constructor',
+	'prototype',
+	'__defineGetter__',
+	'__defineSetter__',
+	'__lookupGetter__',
+	'__lookupSetter__',
+])
 type UpstreamParams = Record<string, string | true | undefined>
 
 function upstreamParseLineParameters(line: string): UpstreamParams {
