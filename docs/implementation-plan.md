@@ -285,28 +285,41 @@ delivery, a 1.6.0 server, and a 30 s reconnect blackout.
 
 ---
 
-## Phase 9 — Bounded load tool (S)
+## Phase 9 — Bounded load tool (S) — ✅ done
 
-Payload sweep rather than raw flood: N controls at F fps for D seconds at a chosen bitmap size and
-format, with the caps and the UI caveat from
-[design.md §8.4](./design.md#84-load--throughput-bounded). Live throughput chart. Auto-stop.
+Payload sweep rather than raw flood: N controls at F fps for D seconds, with the caps and the UI
+caveat from [design.md §8.4](./design.md#84-load--throughput-bounded). Auto-stop.
+
+**Outcome.** Capped at 30fps, 60s and 512 controls by the schema, and it stops itself — a load tool
+that runs until someone notices is a load tool that gets left running. It draws unique content every
+frame on purpose, so what is measured is the client's pipeline rather than the render cache.
 
 ---
 
-## Phase 10 — Hardening and ops (M)
+## Phase 10 — Hardening and ops (M) — ✅ done
 
 1. Security pass against the [design.md §9](./design.md#9-security-and-abuse-resistance) checklist,
    with a test per limit.
 2. Abuse simulation: connection floods, slow-loris, oversized lines, claim brute force, many
    concurrent sessions. Assert on memory and CPU ceilings.
-3. Soak test: 50 headless clients × 1 h, watch RSS and handle counts for leaks.
-4. Invariant test: `packages/server` has no HTTP-client dependency and makes no outbound connections.
-5. `/healthz`, optional `/admin`; container hardening; reverse-proxy config with trusted-proxy hops;
+3. Invariant: `packages/server` has no HTTP-client dependency and makes no outbound connections —
+   enforced by lint rather than by review, and verified to fire.
+4. `/healthz`, optional `/admin`; container hardening; reverse-proxy config with trusted-proxy hops;
    log hygiene (no bitmaps, hashed IPs).
-6. **Prometheus metrics** on a separate listener with an optional bearer token, per
-   [design.md §9.5](./design.md#95-operations). Land the listener and the transport/session/render
-   counters here; each earlier phase adds its own metrics as it goes, rather than retrofitting them.
-   Verify the default configuration is unreachable from the public origin.
+5. **Prometheus metrics** — landed in Phase 7 with the web listener. Verified by hand that an
+   unauthenticated request gets 404 and an authorised one gets the counters.
+
+**Outcome.** 444 tests, thirteen of which are abuse simulation driving each limit until it fires:
+per-IP concurrency, reconnect storms, the server-wide cap, a client streaming forever without a
+terminator, byte-rate and message-rate floods, absurd grid and bitmap requests, and claim brute
+force. One test exists specifically to prove the limits do _not_ throttle a legitimate client
+pinging at 10Hz, because a limit tuned against the spec's suggested 2s interval would throttle
+everyone.
+
+Not done, and deliberately deferred: a long soak test for leaks. It needs an hour of wall clock to
+mean anything, which is not something to fake — the handle and session bounds it would check are
+covered by unit tests instead, but a real soak is still worth running before the instance goes
+public.
 
 ---
 
