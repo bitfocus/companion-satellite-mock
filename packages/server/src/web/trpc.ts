@@ -6,6 +6,7 @@ import type { MockRuntime } from '../runtime.js'
 import { isSafeValue } from '@satellite-mock/protocol'
 import { TokenBucket } from '../limits.js'
 import { ChaosConfigSchema, DEFAULT_CHAOS } from '../chaos.js'
+import { MAX_BLACKOUT_MS } from '../blackout.js'
 import type { SatelliteServer } from '../satelliteServer.js'
 
 export interface TrpcContext {
@@ -360,10 +361,52 @@ export const appRouter = t.router({
 			return { ok: true }
 		}),
 
-	disconnect: mutation.input(sessionIdInput).mutation(({ ctx, input }) => {
+	/**
+	 * Drop the client, optionally with a status code, optionally refusing it back for a while.
+	 *
+	 * The blackout is deliberately keyed on the address of *this session's own connection* and
+	 * nothing else. An operator can hold out the client they are already holding the claim code
+	 * for, which is themselves; there is no input by which another address could be named.
+	 */
+	disconnect: mutation
+		.input(
+			sessionIdInput.extend({
+				/** Restricted to codes a server may legitimately send; 1005/1006 are never on the wire. */
+				code: z
+					.union([z.literal(1000), z.literal(1001), z.literal(1008), z.literal(1011), z.literal(1013)])
+					.optional(),
+				reason: z.string().max(80).optional(),
+				blackoutMs: z.number().int().min(0).max(MAX_BLACKOUT_MS).default(0),
+			})
+		)
+		.mutation(({ ctx, input }) => {
+			const session = requireClaimed(ctx, input.sessionId)
+			if (!session.connection)
+				throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Client not connected' })
+
+			const ip = session.connection.connection.remoteAddress
+			// Started before the close so there is no window in which a fast client reconnects first.
+			const until = input.blackoutMs > 0 ? ctx.satellite.blackoutIp(ip, input.blackoutMs) : null
+
+			session.connection.close(input.code, input.reason)
+			return { ok: true, blackoutUntil: until }
+		}),
+
+	/** How much longer this session's address is being refused, if it is. */
+	blackout: publicProcedure.input(sessionIdInput).query(({ ctx, input }) => {
 		const session = requireClaimed(ctx, input.sessionId)
-		if (!session.connection) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Client not connected' })
-		session.connection.close()
+		const ip = session.connection?.connection.remoteAddress ?? session.lastRemoteAddress
+		const state = ip ? ctx.satellite.blackoutFor(ip) : undefined
+		return { active: state !== undefined, remainingMs: state?.remainingMs ?? 0, maxMs: MAX_BLACKOUT_MS }
+	}),
+
+	/** End a blackout early, for when a minute of waiting is no longer interesting. */
+	clearBlackout: mutation.input(sessionIdInput).mutation(({ ctx, input }) => {
+		const session = requireClaimed(ctx, input.sessionId)
+		const ip = session.connection?.connection.remoteAddress ?? session.lastRemoteAddress
+		if (!ip) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No address on record' })
+
+		ctx.satellite.clearBlackout(ip)
 		return { ok: true }
 	}),
 })

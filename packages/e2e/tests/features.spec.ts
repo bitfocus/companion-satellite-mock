@@ -131,3 +131,80 @@ test.describe('subscriptions', () => {
 		await expect(page.getByTestId('subscriptions-panel')).toContainText('no subscriptions')
 	})
 })
+
+/**
+ * The reconnect tools.
+ *
+ * A plain disconnect only proves the client noticed. What breaks in the field is the loop that
+ * follows, and neither the status code the client is given nor a server that stays unreachable is
+ * observable from a unit test — both need a real socket to a real listener.
+ */
+test.describe('disconnect and reconnect', () => {
+	test('closes with the status code the operator chose', async ({ page, stack }) => {
+		await claim(page, stack)
+
+		const closed = new Promise<number>((resolve) => stack.client.once('close', (code) => resolve(code)))
+
+		await page.getByTestId('close-code').selectOption('1013')
+		await page.getByTestId('blackout-seconds').fill('0')
+		await page.getByTestId('disconnect-with-code').click()
+
+		// 1013 "try again later" rather than the 1006 an abrupt terminate produces.
+		expect(await closed).toBe(1013)
+	})
+
+	test('refuses the client back while the blackout runs, then lets it in', async ({ page, stack }) => {
+		await claim(page, stack)
+
+		const closed = new Promise<void>((resolve) => stack.client.once('close', () => resolve()))
+		await page.getByTestId('blackout-seconds').fill('3')
+		await page.getByTestId('disconnect-with-code').click()
+		await closed
+
+		await expect(page.getByTestId('blackout-status')).toBeVisible()
+
+		// A reconnect during the blackout is refused with 1013 rather than admitted.
+		const refused = new TestSatelliteClient({ url: stack.satelliteUrl, pingIntervalMs: 0 })
+		const refusedCode = new Promise<number>((resolve) => refused.once('close', (code) => resolve(code)))
+		await refused.connect()
+		expect(await refusedCode).toBe(1013)
+
+		// And once it expires the client gets back in, which is the half that proves it is a
+		// blackout rather than a ban.
+		const later = new TestSatelliteClient({ url: stack.satelliteUrl, pingIntervalMs: 0 })
+		await expect
+			.poll(
+				async () => {
+					try {
+						await later.connect()
+						const begin = await later.waitFor('BEGIN', 2000)
+						return begin.command
+					} catch {
+						later.close()
+						return null
+					}
+				},
+				{ timeout: 15_000, intervals: [500] }
+			)
+			.toBe('BEGIN')
+		later.close()
+	})
+
+	test('clearing the blackout lets the client straight back in', async ({ page, stack }) => {
+		await claim(page, stack)
+
+		const closed = new Promise<void>((resolve) => stack.client.once('close', () => resolve()))
+		await page.getByTestId('blackout-seconds').fill('60')
+		await page.getByTestId('disconnect-with-code').click()
+		await closed
+
+		await expect(page.getByTestId('blackout-status')).toBeVisible()
+		await page.getByTestId('clear-blackout').click()
+		await expect(page.getByTestId('blackout-status')).toBeHidden()
+
+		const back = new TestSatelliteClient({ url: stack.satelliteUrl, pingIntervalMs: 0 })
+		await back.connect()
+		expect((await back.waitFor('BEGIN', 5000)).command).toBe('BEGIN')
+		back.close()
+	})
+})

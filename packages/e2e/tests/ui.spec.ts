@@ -186,7 +186,9 @@ test.describe('connection controls', () => {
 		await claim(page, stack)
 		const closed = new Promise<void>((resolve) => stack.client.once('close', () => resolve()))
 
-		await page.getByTestId('connection-panel').getByRole('button', { name: 'Force disconnect' }).click()
+		// No blackout: this test is about the UI noticing the client is gone, not about reconnects.
+		await page.getByTestId('blackout-seconds').fill('0')
+		await page.getByTestId('disconnect-with-code').click()
 		await closed
 		await expect(page.locator('.badge')).toHaveText('offline', { timeout: 15_000 })
 	})

@@ -161,3 +161,36 @@ describe('ChaosConnection', () => {
 		expect(inner.frames).toHaveLength(0)
 	})
 })
+
+describe('ChaosConnection close codes', () => {
+	it('passes a close code through to the transport', () => {
+		const inner = fakeConnection()
+		const closes: [number, string | undefined][] = []
+		inner.closeWith = (code, reason) => closes.push([code, reason])
+
+		new ChaosConnection(inner, DEFAULT_CHAOS).closeWith(1013, 'blackout')
+
+		expect(closes).toEqual([[1013, 'blackout']])
+	})
+
+	it('falls back to destroy on a transport with no concept of one', () => {
+		const inner = fakeConnection()
+		const destroy = vi.fn()
+		inner.destroy = destroy
+
+		new ChaosConnection(inner, DEFAULT_CHAOS).closeWith(1001)
+
+		expect(destroy).toHaveBeenCalledOnce()
+	})
+
+	it('drops coalesced lines rather than delivering a batch after the close', () => {
+		const inner = fakeConnection()
+		inner.closeWith = () => {}
+		const chaos = new ChaosConnection(inner, ChaosConfigSchema.parse({ coalesceMs: 500 }))
+
+		chaos.send('KEY-STATE x\n')
+		chaos.closeWith(1001)
+
+		expect(inner.frames).toEqual([])
+	})
+})

@@ -231,10 +231,19 @@ export class SatelliteSession {
 		this.send(serialiseError(messageName, null, message))
 	}
 
-	close(): void {
+	/**
+	 * Close the connection, optionally with a WebSocket status code the client can read.
+	 *
+	 * Without a code this is Companion's `destroy()`: an abrupt terminate, which is what the server
+	 * does on its own error paths. A code is only ever supplied by the fault-injection tools, where
+	 * the whole point is to see how the client's reconnect logic reacts to each one.
+	 */
+	close(code?: number, reason?: string): void {
 		if (this.#closed) return
 		this.#closed = true
-		this.connection.destroy()
+
+		if (code !== undefined && this.connection.closeWith) this.connection.closeWith(code, reason)
+		else this.connection.destroy()
 	}
 
 	get closed(): boolean {

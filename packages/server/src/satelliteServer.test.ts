@@ -157,13 +157,18 @@ describe('SatelliteServer', () => {
 	})
 
 	it('keeps a pinging connection alive past the idle timeout', async () => {
-		const { url, server } = await startServer({ IDLE_TIMEOUT_MS: 150, IDLE_CHECK_INTERVAL_MS: 20 })
+		// The margin between the ping interval and the idle timeout is deliberately wide. It was one
+		// timeout to five ping intervals, which failed under a loaded event loop: with the whole suite
+		// running, a 30ms interval can be starved long enough to look idle, and the test then failed
+		// for a reason that had nothing to do with what it asserts.
+		const { url, server } = await startServer({ IDLE_TIMEOUT_MS: 400, IDLE_CHECK_INTERVAL_MS: 20 })
 		const { socket, opened } = connect(url)
 		await opened
 
-		const pinger = setInterval(() => socket.readyState === WebSocket.OPEN && socket.send('PING\n'), 30)
+		const pinger = setInterval(() => socket.readyState === WebSocket.OPEN && socket.send('PING\n'), 40)
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 500))
+			// Well past several idle windows, so a connection that was not being kept alive is gone.
+			await new Promise((resolve) => setTimeout(resolve, 1200))
 			expect(server.connectionCount).toBe(1)
 		} finally {
 			clearInterval(pinger)

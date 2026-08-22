@@ -35,12 +35,15 @@ export interface TestClientOptions {
 export interface TestClientEvents {
 	message: [ReceivedMessage]
 	open: []
-	close: []
+	/** The WebSocket status code and reason, so a test can assert which one the server sent. */
+	close: [number, string]
 	error: [Error]
 }
 
 export class TestSatelliteClient extends EventEmitter<TestClientEvents> {
 	readonly received: ReceivedMessage[] = []
+	/** The status code of the most recent close, for tests that care which one arrived. */
+	lastCloseCode: number | undefined
 
 	#socket: WebSocket | undefined
 	#buffer = ''
@@ -58,9 +61,10 @@ export class TestSatelliteClient extends EventEmitter<TestClientEvents> {
 
 		socket.on('message', (data) => this.#onData(data.toString()))
 		socket.on('error', (error) => this.emit('error', error))
-		socket.on('close', () => {
+		socket.on('close', (code: number, reason: Buffer) => {
 			if (this.#ping) clearInterval(this.#ping)
-			this.emit('close')
+			this.lastCloseCode = code
+			this.emit('close', code, reason.toString())
 		})
 
 		await new Promise<void>((resolve, reject) => {

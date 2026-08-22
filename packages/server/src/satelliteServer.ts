@@ -9,6 +9,7 @@ import { ChaosConnection, DEFAULT_CHAOS, type ChaosConfig } from './chaos.js'
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { Config } from './config.js'
+import { ReconnectBlackout, MAX_BLACKOUT_MS } from './blackout.js'
 import { ConnectionRegistry, resolveClientIp } from './limits.js'
 import { hashIp, type Logger } from './logging.js'
 import { buildCommandHandlers } from './commands.js'
@@ -38,6 +39,7 @@ export class SatelliteServer {
 	readonly #events: SatelliteEvents
 	readonly #subscriptionsEnabled: boolean
 	readonly #registry: ConnectionRegistry
+	readonly #blackout = new ReconnectBlackout()
 	readonly #devices = new DeviceRegistry()
 	readonly #sessions = new Set<SatelliteSession>()
 	/** Lets the API reach a connection's chaos wrapper without threading it through every layer. */
@@ -81,6 +83,30 @@ export class SatelliteServer {
 		return true
 	}
 
+	/**
+	 * Hold an address out of the server for a while, so a client's reconnect loop can be exercised.
+	 *
+	 * Bounded and self-expiring; the API layer only ever passes the address of the caller's own
+	 * connection. See `blackout.ts` for why both of those matter.
+	 */
+	blackoutIp(ip: string, durationMs: number): number {
+		const until = this.#blackout.add(ip, durationMs)
+		this.#logger.info({ ip: hashIp(ip), untilMs: until - Date.now() }, 'reconnect blackout started')
+		return until
+	}
+
+	clearBlackout(ip: string): void {
+		this.#blackout.clear(ip)
+	}
+
+	blackoutFor(ip: string): { until: number; remainingMs: number } | undefined {
+		return this.#blackout.state(ip)
+	}
+
+	get maxBlackoutMs(): number {
+		return MAX_BLACKOUT_MS
+	}
+
 	get address(): { port: number } | undefined {
 		const addr = this.#http?.address()
 		return addr && typeof addr === 'object' ? { port: addr.port } : undefined
@@ -109,6 +135,13 @@ export class SatelliteServer {
 				this.#config.TRUSTED_PROXY_HOPS
 			)
 
+			if (this.#blackout.blocks(ip)) {
+				// 1013 rather than a terminate: the blackout is a test of how the client backs off, and
+				// a code it can read is part of what is being tested.
+				socket.close(1013, 'blackout')
+				return
+			}
+
 			const admission = this.#registry.admit(ip)
 			if (!admission.ok) {
 				this.#logger.warn({ ip: hashIp(ip), reason: admission.reason }, 'connection refused')
@@ -133,7 +166,10 @@ export class SatelliteServer {
 
 		this.#liveness = setInterval(() => this.#checkLiveness(), this.#config.IDLE_CHECK_INTERVAL_MS)
 		this.#liveness.unref()
-		this.#sweep = setInterval(() => this.#registry.sweep(), 60_000)
+		this.#sweep = setInterval(() => {
+			this.#registry.sweep()
+			this.#blackout.sweep()
+		}, 60_000)
 		this.#sweep.unref()
 
 		this.#logger.info(

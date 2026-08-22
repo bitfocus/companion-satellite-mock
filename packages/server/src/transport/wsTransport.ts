@@ -3,6 +3,9 @@ import type { IncomingMessage } from 'node:http'
 import type { WebSocket } from 'ws'
 import type { SatelliteConnection } from './types.js'
 
+/** How long a peer gets to answer a close frame before the socket is terminated anyway. */
+const CLOSE_GRACE_MS = 2000
+
 /**
  * A `SatelliteConnection` over a WebSocket.
  *
@@ -66,6 +69,28 @@ export class WebSocketConnection implements SatelliteConnection {
 		// terminate() rather than close(): a peer that never sends its own close frame would
 		// otherwise linger, and this must be the hard-kill path the chaos tools rely on.
 		this.socket.terminate()
+	}
+
+	/**
+	 * Close with a status code the client can actually read, then hard-kill if it does not answer.
+	 *
+	 * `close()` alone is not enough: a peer that never returns its own close frame would leave the
+	 * socket half-open indefinitely, so the terminate is the backstop. Marking closed immediately
+	 * stops anything further being written into a socket that is on its way out.
+	 */
+	closeWith(code: number, reason?: string): void {
+		if (this.#closed) return
+		this.#closed = true
+
+		try {
+			this.socket.close(code, reason)
+		} catch {
+			this.socket.terminate()
+			return
+		}
+
+		const timer = setTimeout(() => this.socket.terminate(), CLOSE_GRACE_MS)
+		timer.unref?.()
 	}
 
 	markClosed(): void {

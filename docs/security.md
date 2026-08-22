@@ -43,10 +43,19 @@ All are configurable by environment variable.
 | Rendered controls            | 512                                | —                                                          |
 | Bitmap dimension             | 512 px, rejected not clamped       | —                                                          |
 | Claim attempts               | 5/min per browser                  | —                                                          |
+| Reconnect blackout           | 60 s, self-expiring                | —                                                          |
 
 The frame cap and the line cap are separate on purpose: a line may arrive split across many frames,
 and many lines may arrive coalesced into one, so tying them together disconnects a client that
 batches its writes.
+
+The reconnect blackout is the one tool here that _refuses_ traffic rather than bounding it, so it
+gets an extra note. It exists so a client's backoff can be tested, and it is deliberately not
+addressable: the API takes no address, only a session, and applies the blackout to whatever address
+that session's own connection is coming from. Holding the claim code for a session means being the
+client on the other end of it, so the only address an operator can hold out is their own. It is
+capped at a minute, expires on its own, can be cleared early, and is keyed by `normaliseIp` so a
+routed IPv6 prefix is not a way to walk straight back in.
 
 The inbound rate limits are tuned against the **reference client, which pings at 10 Hz** — not
 against the spec's suggested 2 s interval, which would throttle every real client. There is a test

@@ -351,9 +351,18 @@ Controls:
 
 All of these apply only to the session the acting browser has claimed, and all have hard ceilings.
 
-- **Disconnect**: graceful close, abrupt `terminate()`, specific WebSocket close codes.
-- **Refuse reconnects** for N seconds (≤120), in three flavours: reject the upgrade, accept then
-  immediately close, accept and never send `BEGIN`.
+- **Disconnect**: graceful close, abrupt `terminate()`, specific WebSocket close codes. Built. The
+  code is chosen from a fixed list of ones a server may legitimately send (1000, 1001, 1008, 1011,
+  1013), plus "no code", which is the abrupt terminate the server itself uses on its error paths.
+  `close()` is followed by a terminate after a two-second grace, or a peer that never returns its
+  own close frame would leave the socket half-open indefinitely.
+- **Refuse reconnects** for N seconds, so the client's _backoff_ is testable rather than just its
+  ability to notice. Built, capped at 60 s, self-expiring, and clearable early. The blackout is
+  keyed by `normaliseIp` for the same reason the connection limits are, and the API only ever
+  passes the address of the caller's own connection — there is no input by which another address
+  could be named, so the worst an operator can do is take themselves offline for a minute. The
+  other two flavours originally sketched (accept then immediately close; accept and never send
+  `BEGIN`) are not built: refusing the upgrade with 1013 covers the case that matters.
 - **Ping misbehaviour**: stop answering `PING`; answer late; answer with the wrong payload; stop
   sending server `PING`; a bounded `PING` burst.
 - **Latency/jitter** on outbound (fixed or random range, ≤2 s) and on inbound processing.

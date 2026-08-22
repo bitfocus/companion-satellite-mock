@@ -17,7 +17,14 @@ function makeManager(clock = fakeClock()) {
 }
 
 /** A stand-in for a live connection — the manager only ever checks whether one is present. */
-const fakeConnection = () => ({}) as never
+/**
+ * Enough of a connection for the manager, which reads the remote address off it.
+ *
+ * It was an empty cast until `attach` started recording the address; an empty stub then threw on
+ * every test in this file, which is the useful kind of failure — the manager really does depend on
+ * it now, so the stub has to be honest about that.
+ */
+const fakeConnection = (remoteAddress = '198.51.100.7') => ({ connection: { remoteAddress } }) as never
 
 describe('SessionManager claiming', () => {
 	it('claims by code', () => {

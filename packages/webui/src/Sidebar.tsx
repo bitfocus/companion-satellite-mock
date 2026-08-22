@@ -4,6 +4,7 @@ import { trpc } from './trpc.js'
 import { ChaosPanel, VersionPanel } from './ChaosPanel.js'
 import { DeviceConfigPanel } from './DeviceConfigPanel.js'
 import { SubscriptionsPanel } from './SubscriptionsPanel.js'
+import { ReconnectPanel } from './ReconnectPanel.js'
 
 interface ScenarioInfo {
 	id: string
@@ -159,14 +160,11 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 
 			<VersionPanel apiVersions={apiVersions} />
 
+			<ReconnectPanel sessionId={session.id} connected={session.connected} />
+
 			<section className="card" data-testid="connection-panel">
 				<h2>Connection</h2>
 				<div className="toolbar">
-					<button
-						onClick={() => act(() => trpc.disconnect.mutate({ sessionId: session.id }), 'Disconnected')}
-					>
-						Force disconnect
-					</button>
 					<button
 						onClick={() =>
 							act(async () => {

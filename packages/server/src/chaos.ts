@@ -202,4 +202,14 @@ export class ChaosConnection implements SatelliteConnection {
 		if (this.#coalesceTimer) clearTimeout(this.#coalesceTimer)
 		this.inner.destroy()
 	}
+
+	closeWith(code: number, reason?: string): void {
+		if (this.#coalesceTimer) clearTimeout(this.#coalesceTimer)
+		// Anything still buffered by the coalesce knob is dropped rather than flushed: a close is a
+		// close, and delivering a batch after it would be the wrapper inventing traffic.
+		this.#coalesceBuffer = []
+
+		if (this.inner.closeWith) this.inner.closeWith(code, reason)
+		else this.inner.destroy()
+	}
 }

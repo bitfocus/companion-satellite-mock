@@ -48,6 +48,13 @@ export class MockSession {
 	connection: SatelliteSession | undefined
 	primaryDeviceId: string | undefined
 	disconnectedAt: number | undefined
+	/**
+	 * The address of the most recent connection, kept after it goes away.
+	 *
+	 * The reconnect blackout has to be readable precisely when there is no connection to read it
+	 * from — that is the state it exists to create — so the address outlives the socket.
+	 */
+	lastRemoteAddress: string | undefined
 
 	readonly trace: TraceEntry[] = []
 
@@ -196,6 +203,7 @@ export class SessionManager {
 		if (existing) {
 			existing.connection = connection
 			existing.disconnectedAt = undefined
+			existing.lastRemoteAddress = connection.connection.remoteAddress
 			this.#byConnection.set(connection, existing)
 			return existing
 		}
@@ -203,6 +211,7 @@ export class SessionManager {
 		const session = this.create()
 		session.primaryDeviceId = primaryDeviceId
 		session.connection = connection
+		session.lastRemoteAddress = connection.connection.remoteAddress
 		this.#byPrimaryDevice.set(primaryDeviceId, session)
 		this.#byConnection.set(connection, session)
 		return session

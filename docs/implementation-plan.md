@@ -363,8 +363,6 @@ extras rather than the code; `unclaimed.test.ts` pins it across eight surface si
 
 Stated plainly rather than rounded up.
 
-- **Reconnect-blackout and force-disconnect-with-close-code** chaos tools are not built. Plain force
-  disconnect is.
 - **The soak test.** It needs an hour of wall clock to mean anything.
 - **The Docker build has never run.** There is no daemon in the environment this was built in, so
   CI will be its first execution. The Dockerfile is written and the CI job builds and smoke tests

@@ -29,6 +29,15 @@ export interface SatelliteConnection {
 	send(line: string): void
 	/** Close hard, the equivalent of Companion's `destroy()`. */
 	destroy(): void
+	/**
+	 * Close gracefully with a specific status code, where the transport has such a concept.
+	 *
+	 * Which code a client receives changes what a well-written one does next — 1001 "going away"
+	 * invites an immediate reconnect, 1013 "try again later" asks for a backoff, 1008 says stop —
+	 * and getting that wrong is invisible under `destroy()`, which delivers no code at all.
+	 * Optional: TCP has nothing to map it onto and will fall back to `destroy()`.
+	 */
+	closeWith?(code: number, reason?: string): void
 	readonly closed: boolean
 }
 
