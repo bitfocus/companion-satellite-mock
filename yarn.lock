@@ -913,6 +913,7 @@ __metadata:
   dependencies:
     "@napi-rs/canvas": "npm:^0.1.80"
     "@satellite-mock/protocol": "workspace:*"
+    "@satellite-mock/testclient": "workspace:*"
     "@trpc/server": "npm:^11.5.0"
     "@types/express": "npm:^5.0.3"
     "@types/ws": "npm:^8.18.1"
@@ -926,7 +927,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@satellite-mock/testclient@workspace:packages/testclient":
+"@satellite-mock/testclient@workspace:*, @satellite-mock/testclient@workspace:packages/testclient":
   version: 0.0.0-use.local
   resolution: "@satellite-mock/testclient@workspace:packages/testclient"
   dependencies:

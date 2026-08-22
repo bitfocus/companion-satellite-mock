@@ -190,20 +190,20 @@ capability profile.
 
 ## Phase 6 — Test client and scenario engine (L)
 
-### 6a — `packages/testclient` (S, pull earlier if useful)
+### 6a — `packages/testclient` — ✅ done
 
 A headless satellite client built on `packages/protocol`: connects, registers a configurable surface,
 logs everything, can send scripted input. Used by integration tests and as a manual probe. Build this
 as soon as Phase 2 lands if it speeds up development.
 
-### 6b — Scenario engine (M)
+### 6b — Scenario engine — ✅ done
 
 1. `Scenario` interface and `ScenarioContext` as in [design.md §7](./design.md#7-demo-modes-scenarios).
 2. Single shared tick timer for all sessions with a global work budget.
 3. Feature detection and graceful degradation; per-scenario zod param schemas.
 4. Scenario registry and lifecycle (attach/detach/switch, dispose cleanly).
 
-### 6c — Scenarios, in value order (L)
+### 6c — Scenarios, in value order — ✅ done (9 of the catalogue)
 
 1. **Unclaimed** — first, it's the default and the zero-interaction path.
 2. **Input echo** — earns its keep immediately during client development.
@@ -215,6 +215,19 @@ as soon as Phase 2 lands if it speeds up development.
 
 **Done when:** each scenario has an integration test driving it through the headless client and
 asserting on the emitted lines.
+
+**Outcome.** 380 tests. The engine runs every scenario from one shared timer rather than a timer
+each — with a few hundred sessions, per-scenario timers are hundreds of wakeups a second doing
+nothing — and contains anything a scenario throws, so a broken scenario cannot take a connection
+down.
+
+`MockRuntime` wires it together, and the zero-interaction path is a test: a client that connects and
+registers gets a live surface with the claim code drawn on it, responds to presses, and keeps its
+code across a reconnect — with no web UI involved at any point.
+
+Shipped: Unclaimed, Input echo, Companion home, Colour & text matrix, Bitmap torture, Encoder lab,
+Pincode lock, Brightness, Variables, Attract. Subscriptions and Stress land with Phases 7 and 9,
+which is where their UI lives.
 
 ---
 
