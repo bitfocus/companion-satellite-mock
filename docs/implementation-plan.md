@@ -148,13 +148,13 @@ a browser — the characters people misread matter more than the extra entropy, 
 limiter is what makes the length sufficient. Comparison is constant time, and unclaiming mints a
 fresh code.
 
-Collection needs *both* ends gone: the client disconnected **and** no browser watching. An operator
+Collection needs _both_ ends gone: the client disconnected **and** no browser watching. An operator
 with the tab open keeps a crashed client's session, which is the behaviour that matters
 mid-debugging; the absolute lifetime cap is what stops a forgotten tab holding one open forever.
 
 ---
 
-## Phase 4 — Renderer (M)
+## Phase 4 — Renderer (M) — 🚧 mostly done
 
 1. Button renderer on `@napi-rs/canvas`: background, border, text with wrapping and `auto` sizing,
    pressed treatment, `PAGEUP`/`PAGEDOWN`/`PAGENUM` glyphs, rotation.
