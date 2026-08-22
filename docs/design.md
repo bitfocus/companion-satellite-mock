@@ -86,6 +86,16 @@ see a working, interactive, self-explanatory surface.
   contains device ids and payloads — requires the code. There is no public browsable list.
 - Explicit unclaim, controller idle timeout, or session expiry returns the surface to Unclaimed and
   re-draws a fresh code.
+- **A subscribed browser keeps the session alive too.** The GC window starts only once *both* ends
+  are gone: the satellite connection has dropped **and** no controller is actively subscribed. So a
+  client that vanishes while the operator still has the tab open keeps its claim, scenario, chaos
+  settings and trace indefinitely — the UI just shows the device as offline, which is the behaviour
+  you want when you're mid-debugging and the app crashes. "Actively subscribed" means a live tRPC
+  subscription with a heartbeat, not merely "claimed at some point", so a closed laptop lid releases
+  it on the normal window.
+- Because that lets a browser hold a session open indefinitely, it is bounded: at most 4 held
+  sessions per UI client, and an absolute session lifetime cap of 12 h regardless of activity. A
+  session is only a few KB plus its ring buffer, so this is cheap.
 
 ### 4.4 Multiple devices per connection
 
@@ -169,6 +179,42 @@ knowing.
 
 - **Encoders:** raw RGB (`w*h*3`, base64) for `rgb`; `canvas.encode('png'|'webp')` wrapped in a
   `data:` URL for the others. Format follows the per-device/per-subscription negotiation.
+### Measured (Phase 0 spike, Node 26.7.0 / `@napi-rs/canvas` / x64)
+
+The spike ran before any design was committed to; the numbers moved two decisions.
+
+| Operation (72×72 button) | ms/op |
+|---|---|
+| draw only | 0.068 |
+| `getImageData()` + naive RGBA→RGB loop | ~1.14 |
+| **`canvas.data()` + tight indexed loop** | **0.144** |
+| `toBuffer('image/png')` | 0.42 |
+| `toBuffer('image/webp')` | 0.66 |
+| Full unique 32-key surface, draw + rgb, fast path | **12.0** (was 43.6 naive) |
+
+Payloads for that button: `rgb` 15552 B, `png` 1155 B, `webp` 1168 B.
+
+Three conclusions:
+
+1. **Use `canvas.data()`, not `getImageData()`** — 13× cheaper, and the RGBA→RGB loop must be written
+   with explicit indexing (`out[o]=…; o+=3`) rather than `o++` per channel, which is a further 3.4×.
+   Together they take a cold full-surface redraw from 44 ms to 12 ms, comfortably inside a 30 fps
+   frame even with every button unique.
+2. **`canvas.data()` returns *premultiplied* RGBA; `getImageData()` does not.** A 50%-alpha white
+   pixel is `7f7f7f7f` from `data()` and `ffffff7f` from `getImageData()`. Buttons are always drawn
+   over an opaque background fill, so alpha is 255 everywhere and the two agree — but that must be an
+   enforced invariant of the renderer (assert opacity in dev builds), not an accident, or
+   transparency silently darkens.
+3. **PNG is cheaper than raw RGB *and* 13× smaller on the wire** — the encode costs less than the
+   RGBA→RGB conversion it replaces. So `png` is the preferred format to negotiate whenever a client
+   can decode it, and `rgb` is the compatibility path rather than the fast path. Worth telling client
+   authors.
+
+Also measured: `canvas.encode()` (the promise-returning form) does **not** meaningfully free the
+event loop — 200 parallel encodes ticked a 1 ms interval only twice. Treat encoding as blocking CPU
+work: the render semaphore is doing real work, and if encoding ever becomes the bottleneck the answer
+is `worker_threads`, not `await`.
+
 - **Cache.** Keyed by `hash(style) + size + format + rotation`. Demo content is highly repetitive
   (same colours, same labels, animation frames that recur), so the cache turns the animation and
   load tools from a CPU problem into a memcpy. Bounded LRU with a byte budget.
@@ -345,7 +391,7 @@ better options; the mitigation here is the caps, not a claim of impossibility.
 | New connections | 30/min per IP, burst 10 |
 | Claim attempts | 5/min per IP with backoff; constant-time compare; codes expire |
 | Outbound queue | Bounded bytes per connection; latest-wins coalescing per control (as Companion's `ImageWriteQueue` does); terminate on overflow rather than buffering |
-| Session lifetime | Idle disconnect 5 s (protocol); session GC 10 min after disconnect; absolute connection cap 12 h |
+| Session lifetime | Idle disconnect 5 s (protocol); session GC 10 min after *both* the client disconnects and the last controller unsubscribes; ≤4 held sessions per UI client; absolute session and connection cap 12 h |
 | Trace buffer | 2000 lines/session, payloads elided |
 
 ### 9.3 Web layer

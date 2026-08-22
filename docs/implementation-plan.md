@@ -17,10 +17,11 @@ Estimates are relative sizes (S/M/L), not calendar time.
 2. Node 26: `.node-version`, `engines`, `"type": "module"`, TypeScript 5.x strict with project
    references, `moduleResolution: nodenext`.
 3. Tooling: ESLint (flat config) + Prettier in the Bitfocus house style, `vitest`, `lint-staged`.
-4. **Spike `@napi-rs/canvas` on Node 26** in the target container image and on the deploy
-   architecture: draw a 72×72 button, encode RGB/PNG/WebP, measure. If prebuilds are missing for the
-   target, decide now (fallback: pure-TS rasteriser + PNG encoder, dropping WebP, which is a
-   negotiated format so clients degrade cleanly).
+4. ~~**Spike `@napi-rs/canvas` on Node 26**~~ — **done**, results in
+   [design.md §6](./design.md#6-rendering). It loads from prebuilds on Node 26.7.0 x64 with no build
+   step; use `canvas.data()` (premultiplied — keep buttons opaque) over `getImageData()`; PNG is
+   both cheaper and 13× smaller than raw RGB. Still to confirm on the deploy architecture if it is
+   arm64, and inside the final container image.
 5. Dockerfile (multi-stage, non-root, read-only rootfs, `--init`, healthcheck) and a
    `docker-compose.yml` with a Caddy TLS front end as the deployment reference.
 6. CI: lint, typecheck, unit tests, docker build.
@@ -102,8 +103,9 @@ error paths return upstream's exact strings, and disconnect/reconnect restores t
    per-session pixel-rate ceiling; dimension caps enforced at `ADD-DEVICE` time.
 5. Benchmarks for cold and warm render paths, checked into the repo.
 
-**Done when:** a full 32-key surface renders in well under one frame at 30 fps warm, and the cache
-hit rate on a repeating animation is >95%.
+**Done when:** a full 32-key surface of *unique* content renders cold in ≤15 ms (the spike measured
+12 ms, so this is a regression guard rather than a target), and the cache hit rate on a repeating
+animation is >95%.
 
 ---
 
