@@ -236,7 +236,12 @@ is `worker_threads`, not `await`.
 - **Cache.** Keyed by `hash(style) + size + format + rotation`. Demo content is highly repetitive
   (same colours, same labels, animation frames that recur), so the cache turns the animation and
   load tools from a CPU problem into a memcpy. Bounded LRU with a byte budget.
-- **Budget.** A global render semaphore (small, e.g. 4) plus a per-session pixels/second ceiling.
+- **Budget.** A per-session pixels/second ceiling, enforced by a token bucket. The design originally
+  called for a global render *semaphore* limiting concurrent renders; that was wrong. The spike
+  measured `canvas.encode()` failing to free the event loop, so rendering is synchronous CPU work on
+  one thread — concurrency is already one, and capping it at four does nothing. Rate plus the cache
+  is what actually bounds the cost. Exceeding the budget drops the frame's *bitmap* and still sends
+  colour and text, so a surface under load stays responsive instead of going dark or disconnecting.
   Bitmap dimensions are capped (default 512×512); an `ADD-DEVICE` asking for more is rejected with a
   protocol error rather than accepted and quietly clamped, so client bugs surface.
 - **Non-square** support is real (the manifest carries `w`/`h`), and `CAPS NONSQUARE` reflects the

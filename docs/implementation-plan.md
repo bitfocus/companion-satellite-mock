@@ -154,7 +154,7 @@ mid-debugging; the absolute lifetime cap is what stops a forgotten tab holding o
 
 ---
 
-## Phase 4 — Renderer (M) — 🚧 mostly done
+## Phase 4 — Renderer (M) — ✅ done
 
 1. Button renderer on `@napi-rs/canvas`: background, border, text with wrapping and `auto` sizing,
    pressed treatment, `PAGEUP`/`PAGEDOWN`/`PAGENUM` glyphs, rotation.
@@ -170,7 +170,7 @@ animation is >95%.
 
 ---
 
-## Phase 5 — Emitter and write queue (M)
+## Phase 5 — Emitter and write queue (M) — ✅ done
 
 1. `buildStyleArgs` equivalent: `PRESSED`, `TYPE`, `BITMAP`, `COLOR`, `TEXTCOLOR`, `TEXT`,
    `FONT_SIZE`, `LEDS` — each gated by both the control's style preset and the capability profile.
@@ -180,6 +180,11 @@ animation is >95%.
 
 **Milestone: end-to-end without a UI.** A hard-coded surface can be driven from a script and a real
 client shows buttons and reports presses.
+
+**Outcome.** 366 tests. Latest-wins coalescing per control, so a control drawn three times before
+the flush is sent once with the newest style; backpressure that drops the queue and closes rather
+than buffering without limit; and every field gated by both the client's style preset and the
+capability profile.
 
 ---
 
