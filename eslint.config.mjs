@@ -48,7 +48,12 @@ export default tseslint.config(
 	{
 		// No user-controlled egress anywhere in the server: the mock must never fetch a URL supplied
 		// over the protocol (notably FIRMWARE-UPDATE-INFO's UPDATE_URL). See docs/design.md §9.1.
+		//
+		// Tests are exempt on the same grounds as the protocol package's rule: they are excluded from
+		// the build, so they are not part of the shipped artifact, and they legitimately need to make
+		// requests *to our own listener* to check it behaves.
 		files: ['packages/server/**/*.ts'],
+		ignores: ['packages/server/**/*.test.ts'],
 		rules: {
 			'no-restricted-globals': [
 				'error',

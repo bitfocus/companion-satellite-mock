@@ -72,13 +72,13 @@ profile, and every message builder is gated by it — at 1.6.0 the builders emit
 `LOCATION`, no `LEDS`, no `TEXTCOLOR` and no `DEVICEID` on responses.
 
 `corpus/satellite-corpus.json` is a hand-authored conformance corpus — written from Companion's
-documented behaviour, *not* generated from this implementation, so it can disagree with us and win.
+documented behaviour, _not_ generated from this implementation, so it can disagree with us and win.
 It ships as plain JSON so a client in any language can run the same cases, which is the one thing
 prose about the trailing-space quirk can never do.
 
 ---
 
-## Phase 2 — Transport and connection lifecycle (M)
+## Phase 2 — Transport and connection lifecycle (M) — ✅ done
 
 1. Express 5 app; `ws` server mounted at `/ws/satellite`.
 2. `SatelliteConnection` abstraction (`send`, `destroy`, `remoteAddress`, `kind`, byte counters) with
@@ -93,6 +93,24 @@ prose about the trailing-space quirk can never do.
 
 **Done when:** a raw `wscat` session receives `BEGIN` + `CAPS`, is kept alive by pings, is dropped
 after 5 s of silence, and the caps are demonstrably enforced by a small abuse script.
+
+**Outcome.** 238 tests. 14 of them drive a real WebSocket against a real listener, because the
+interesting failures in a transport are in the wiring, not the pieces: handshake, raw `PING` echo, a
+command split one byte per frame, many commands coalesced into one frame, unknown-command error,
+case-insensitive dispatch, `QUIT`, the doubled-`ERROR` line-too-long response, idle timeout firing,
+a pinging connection *not* timing out, per-IP admission and slot release, and a 426 for plain HTTP.
+
+Two things worth recording:
+
+- **The frame cap and the line cap are different limits**, and the integration test is what proved
+  it. `ws`'s `maxPayload` had been wired to `MAX_LINE_BYTES`, which is wrong in both directions: a
+  line may arrive split across many frames, and many lines may arrive coalesced into one, so a
+  client that batches its writes would have been killed. `MAX_FRAME_BYTES` is now separate and only
+  exists to stop one enormous frame allocating before the line buffer sees it — the line limit is
+  enforced by `LineBuffer`, where Companion enforces it too.
+- **The connection registry does not spend a rate-limit token on a connection it refuses for being
+  over the concurrent limit.** Otherwise a client sitting at its limit also accrues a lockout it has
+  to wait out after disconnecting, turning a soft limit into a punitive one.
 
 ---
 
