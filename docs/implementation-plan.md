@@ -98,7 +98,7 @@ after 5 s of silence, and the caps are demonstrably enforced by a small abuse sc
 interesting failures in a transport are in the wiring, not the pieces: handshake, raw `PING` echo, a
 command split one byte per frame, many commands coalesced into one frame, unknown-command error,
 case-insensitive dispatch, `QUIT`, the doubled-`ERROR` line-too-long response, idle timeout firing,
-a pinging connection *not* timing out, per-IP admission and slot release, and a 426 for plain HTTP.
+a pinging connection _not_ timing out, per-IP admission and slot release, and a 426 for plain HTTP.
 
 Two things worth recording:
 
@@ -114,7 +114,7 @@ Two things worth recording:
 
 ---
 
-## Phase 3 — Devices, surfaces and sessions (L)
+## Phase 3 — Devices, surfaces and sessions (L) — 🚧 in progress
 
 1. `ADD-DEVICE`: full validation and error paths, both legacy and manifest registration, normalised
    into the internal `Surface` model. `REMOVE-DEVICE`, `QUIT`.
@@ -129,6 +129,12 @@ Two things worth recording:
 
 **Done when:** the headless test client (Phase 6a) can register legacy and advanced surfaces, all
 error paths return upstream's exact strings, and disconnect/reconnect restores the same session.
+
+**Progress.** Step 1's surface model is done: legacy and manifest registrations normalise into one
+internal shape, exactly as Companion does internally, so drawing code addresses controls by id and
+only the emitter cares which mode the client used. `parseKeyParam` handles both the flat index and
+`row/column`, including upstream's tolerance of a leading `+`. Remaining: the device registry and
+command handlers (steps 2–3), and the session manager with claim codes (steps 4–5).
 
 ---
 

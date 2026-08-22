@@ -9,6 +9,7 @@
 export * from './constants.js'
 export * from './parse.js'
 export * from './serialise.js'
+export * from './surface.js'
 export * from './messages.js'
 export * from './versions.js'
 

@@ -57,9 +57,9 @@ describe('conformance corpus', () => {
 		const quirks = new Set(
 			[...corpus.parse, ...corpus.serialise].map((c) => c.quirk).filter((q): q is number => typeof q === 'number')
 		)
-		// Quirks 1, 3, 4, 5, 6, 7, 10, 12 and 17 are expressible as corpus cases. The rest (2, 8, 9,
-		// 11, 13, 14, 15, 16) are about framing, dispatch or server state rather than a single line,
-		// and are covered by their own unit tests instead.
-		expect([...quirks].sort((a, b) => a - b)).toEqual([1, 3, 4, 5, 6, 7, 10, 12, 17])
+		// Quirks 1, 3, 4, 5, 6, 7, 10, 12 and 18 are expressible as a single line in isolation. The
+		// rest (2, 8, 9, 11, 13, 14, 15, 16, 17) are about framing, dispatch or server state, and are
+		// covered by their own unit tests instead.
+		expect([...quirks].sort((a, b) => a - b)).toEqual([1, 3, 4, 5, 6, 7, 10, 12, 18])
 	})
 })

@@ -51,7 +51,10 @@ Each of these is a test case in `packages/protocol`.
 16. **Outbound values are not escaped.** Companion wraps strings in `"` and relies on callers never
     putting a `"` or newline into a value. The mock must be equally careful — and its raw sender is
     where a malformed line would come from.
-17. **Parsed params live on a null-prototype object** and keys in `BANNED_PROPS` (`__proto__` and
+17. **`Number('')` is `0`, so `parseKeyParam('')` resolves to key 0.** Latent rather than
+    observable: the command handlers reject a falsey `KEY` with `Missing KEY` before reaching the
+    parser. Worth knowing before moving that guard.
+18. **Parsed params live on a null-prototype object** and keys in `BANNED_PROPS` (`__proto__` and
     friends) are dropped — a prototype-pollution guard worth keeping.
 
 ## 2. Bounds

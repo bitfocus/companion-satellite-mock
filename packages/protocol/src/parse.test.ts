@@ -65,7 +65,7 @@ describe('parseLineParameters', () => {
 		expect({ ...parseLineParameters('=value A=1') }).toEqual({ A: '1' })
 	})
 
-	it('quirk 17: drops prototype-polluting keys and returns a null-prototype object', () => {
+	it('quirk 18: drops prototype-polluting keys and returns a null-prototype object', () => {
 		const params = parseLineParameters('__proto__=x constructor=y prototype=z SAFE=1')
 		expect({ ...params }).toEqual({ SAFE: '1' })
 		expect(Object.getPrototypeOf(params)).toBeNull()
