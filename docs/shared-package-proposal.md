@@ -8,14 +8,14 @@ shared package would contain, and what adopting it would cost each consumer.
 
 The duplication is not hypothetical and it has already drifted:
 
-| Artifact | Companion | companion-satellite | this repo |
-| --- | --- | --- | --- |
-| `parseLineParameters` | `companion/lib/Resources/Util.ts` | `satellite/src/client/parser.ts` | ported |
-| `BANNED_PROPS` | via `@companion-app/expressions` | local 7-entry literal | inlined literal |
-| Line serialisation | `SatelliteSocketWrapper.sendMessage` | — (parses only) | ported |
-| Manifest / config-field schemas | zod, authoritative | codegen from JSON assets | zod, copied |
-| Version → capability logic | implicit in `SatelliteApi.ts` | hand-rolled `semver` checks | `capabilitiesFor()` |
-| Bounds, patterns, error strings | literals in `SatelliteApi.ts` | — | `constants.ts` |
+| Artifact                        | Companion                            | companion-satellite              | this repo           |
+| ------------------------------- | ------------------------------------ | -------------------------------- | ------------------- |
+| `parseLineParameters`           | `companion/lib/Resources/Util.ts`    | `satellite/src/client/parser.ts` | ported              |
+| `BANNED_PROPS`                  | via `@companion-app/expressions`     | local 7-entry literal            | inlined literal     |
+| Line serialisation              | `SatelliteSocketWrapper.sendMessage` | — (parses only)                  | ported              |
+| Manifest / config-field schemas | zod, authoritative                   | codegen from JSON assets         | zod, copied         |
+| Version → capability logic      | implicit in `SatelliteApi.ts`        | hand-rolled `semver` checks      | `capabilitiesFor()` |
+| Bounds, patterns, error strings | literals in `SatelliteApi.ts`        | —                                | `constants.ts`      |
 
 Three copies of a parser whose **quirks are load-bearing**, and two independent derivations of "what
 does API 1.9 support". The parser copies at least fail loudly when they diverge; the capability logic
@@ -26,7 +26,7 @@ Concretely, three drift bugs that already exist or nearly did:
 - `BANNED_PROPS` differs between Companion's source and satellite's copy (7 entries in both, but by
   coincidence of maintenance, not by construction). This repo's port shipped with 3 until a pin test
   caught it.
-- Satellite's schema codegen reads `../../companion/assets/*.schema.json` — a *sibling checkout*, so
+- Satellite's schema codegen reads `../../companion/assets/*.schema.json` — a _sibling checkout_, so
   the two repos must be cloned together to build.
 - The trailing-space quirk exists only in Companion's serialiser. Nothing tests that clients tolerate
   it; nothing could, without a shared codec.
@@ -62,6 +62,7 @@ surface/control model. Those are where the consumers genuinely differ.
 ## 3. What each consumer gains, and what adoption costs
 
 ### Companion
+
 - **Gains:** one definition of the wire format; the error-string table becomes a typed constant
   instead of inline literals; the version→capability table becomes explicit rather than implicit in
   `SatelliteApi.ts`'s conditionals.
@@ -72,6 +73,7 @@ surface/control model. Those are where the consumers genuinely differ.
   differential corpus (§4) cover it.
 
 ### companion-satellite
+
 - **Gains:** deletes `src/client/parser.ts`; deletes the `tools/schema_compile.mts` codegen and the
   `src/generated/*Schema.ts` output; **stops requiring Companion as a sibling checkout to build**;
   replaces its hand-rolled `semver` feature gating with `capabilitiesFor()`.
@@ -81,6 +83,7 @@ surface/control model. Those are where the consumers genuinely differ.
   adopter after this repo.
 
 ### companion-satellite-mock (this repo)
+
 - **Gains:** deletes `packages/protocol/src/parse.ts`, `serialise.ts`, `versions.ts`,
   `constants.ts` and `src/upstream/` — roughly the whole package becomes a re-export plus the
   mock-specific message builders.
@@ -88,6 +91,7 @@ surface/control model. Those are where the consumers genuinely differ.
 - **Risk:** none worth worrying about; this repo is the cheapest place to prove the package works.
 
 ### A native (non-JS) client
+
 - **Gains nothing from the npm package directly.** What crosses the language boundary is
   `assets/*.schema.json` and the machine-readable capability table (§5). Worth publishing those as
   data, not only as TypeScript — that is the difference between a native client re-deriving the rules
@@ -112,20 +116,37 @@ The version→capability table as data, not code:
 ```jsonc
 {
   "versions": [
-    { "version": "1.10.0", "companion": "v4.3+", "adds": ["caps", "subscriptions", "keyStateLocation",
-      "serialParam", "configFields", "changePage", "firmwareUpdateInfo"] }
+    {
+      "version": "1.10.0",
+      "companion": "v4.3+",
+      "adds": [
+        "caps",
+        "subscriptions",
+        "keyStateLocation",
+        "serialParam",
+        "configFields",
+        "changePage",
+        "firmwareUpdateInfo",
+      ],
+    },
   ],
   "capabilities": {
-    "keyStateLocation": { "since": "1.10.0", "capsFlag": null,
-      "description": "KEY-STATE carries LOCATION=page/row/column when known" },
-    "rotaryAmount": { "since": "1.14.0", "capsFlag": "ROTARY_AMOUNT",
-      "description": "DIRECTION carries a signed step count" }
-  }
+    "keyStateLocation": {
+      "since": "1.10.0",
+      "capsFlag": null,
+      "description": "KEY-STATE carries LOCATION=page/row/column when known",
+    },
+    "rotaryAmount": {
+      "since": "1.14.0",
+      "capsFlag": "ROTARY_AMOUNT",
+      "description": "DIRECTION carries a signed step count",
+    },
+  },
 }
 ```
 
 Note the `capsFlag` distinction, which the published spec is careful about and which is easy to get
-wrong: `ApiVersion` says whether a feature *exists*; `CAPS` says whether it is *enabled right now*.
+wrong: `ApiVersion` says whether a feature _exists_; `CAPS` says whether it is _enabled right now_.
 Encoding that as data means every client gates on it the same way.
 
 This file is also what the mock's version-selector UI renders, and what a docs page could be
@@ -146,7 +167,7 @@ coverage of the wire format.
 3. **Delete** `parse.ts`, `serialise.ts`, `versions.ts`, `constants.ts`, `src/upstream/`,
    `parse.upstream.test.ts`, `bannedProps.test.ts` — all of which exist only because there is no
    package. Keep `schemas.test.ts` and the quirk tests initially, running against the package: if
-   they pass unchanged, the package is a faithful replacement, and *then* they can be dropped as
+   they pass unchanged, the package is a faithful replacement, and _then_ they can be dropped as
    duplicates of the package's own suite.
 4. **Keep the lint invariant** (`packages/protocol` may not import anything doing I/O) — it should
    apply to the package too, and is worth restating in its repo.
