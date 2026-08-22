@@ -213,8 +213,12 @@ format, with the caps and the UI caveat from
    concurrent sessions. Assert on memory and CPU ceilings.
 3. Soak test: 50 headless clients × 1 h, watch RSS and handle counts for leaks.
 4. Invariant test: `packages/server` has no HTTP-client dependency and makes no outbound connections.
-5. `/healthz`, optional `/metrics`, optional `/admin`; container hardening; reverse-proxy config with
-   trusted-proxy hops; log hygiene (no bitmaps, hashed IPs).
+5. `/healthz`, optional `/admin`; container hardening; reverse-proxy config with trusted-proxy hops;
+   log hygiene (no bitmaps, hashed IPs).
+6. **Prometheus metrics** on a separate listener with an optional bearer token, per
+   [design.md §9.5](./design.md#95-operations). Land the listener and the transport/session/render
+   counters here; each earlier phase adds its own metrics as it goes, rather than retrofitting them.
+   Verify the default configuration is unreachable from the public origin.
 
 ---
 

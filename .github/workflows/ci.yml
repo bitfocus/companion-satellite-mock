@@ -13,26 +13,43 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-      - run: corepack enable
-      - run: yarn install --immutable
-      - run: yarn format:check
-      - run: yarn lint
-      - run: yarn typecheck
-      - run: yarn test
-      - run: yarn workspace @satellite-mock/webui build
+      - run: node .yarn/releases/yarn-4.10.3.cjs install --immutable
+      - run: node .yarn/releases/yarn-4.10.3.cjs format:check
+      - run: node .yarn/releases/yarn-4.10.3.cjs lint
+      - run: node .yarn/releases/yarn-4.10.3.cjs typecheck
+      - run: node .yarn/releases/yarn-4.10.3.cjs test
+      - run: node .yarn/releases/yarn-4.10.3.cjs workspace @satellite-mock/webui build
 
   docker:
+    # Build on every PR so a broken image is caught before merge; publishing happens in build.yml.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64
           push: false
+          load: true
+          tags: satellite-mock:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Smoke test the image
+        run: |
+          docker run --rm satellite-mock:ci node -e "
+            const { createCanvas } = require('@napi-rs/canvas')
+            const c = createCanvas(72, 72)
+            const ctx = c.getContext('2d')
+            ctx.fillStyle = '#20304a'; ctx.fillRect(0, 0, 72, 72)
+            ctx.fillStyle = '#fff'; ctx.font = '16px sans-serif'; ctx.fillText('OK', 10, 40)
+            const png = c.toBuffer('image/png')
+            if (png.length < 100) throw new Error('png too small: ' + png.length)
+            const { data } = ctx.getImageData(0, 0, 72, 72)
+            if (![...data].some((v, i) => i % 4 < 3 && v > 200)) throw new Error('no text rendered — fonts missing?')
+            console.log('canvas ok, png ' + png.length + ' bytes')
+          "

@@ -201,11 +201,28 @@ Three conclusions:
    with explicit indexing (`out[o]=…; o+=3`) rather than `o++` per channel, which is a further 3.4×.
    Together they take a cold full-surface redraw from 44 ms to 12 ms, comfortably inside a 30 fps
    frame even with every button unique.
-2. **`canvas.data()` returns _premultiplied_ RGBA; `getImageData()` does not.** A 50%-alpha white
-   pixel is `7f7f7f7f` from `data()` and `ffffff7f` from `getImageData()`. Buttons are always drawn
-   over an opaque background fill, so alpha is 255 everywhere and the two agree — but that must be an
-   enforced invariant of the renderer (assert opacity in dev builds), not an accident, or
-   transparency silently darkens.
+2. **`canvas.data()` returns _premultiplied_ RGBA; `getImageData()` returns _straight_.** This is
+   the one to get right — it has bitten Companion. Measured on a 50%-alpha white pixel over nothing:
+
+   | source                          | pixel      | drop alpha → rgb                  |
+   | ------------------------------- | ---------- | --------------------------------- |
+   | `canvas.data()` (premultiplied) | `7f7f7f7f` | `7f7f7f` — composited on black ✅ |
+   | `getImageData()` (straight)     | `ffffff7f` | `ffffff` — ignores alpha ❌       |
+
+   Companion resolves this the same way: `transformButtonImage` documents its input as _straight_
+   alpha RGBA and converts with `premultiplyAlpha: targetFormat.length === 3` — i.e. **the `rgb` wire
+   format is premultiplied**, because dropping a channel from straight-alpha data is simply wrong.
+
+   So the rule is not "either works, because buttons are opaque". It is:
+
+   - **`rgb` path → `canvas.data()`**, which is both the fast path _and_ the correct one, matching
+     Companion byte for byte.
+   - **`png`/`webp` path → `canvas.toBuffer()`/`encode()`**, which keep the alpha channel and must
+     therefore see _straight_ alpha. Never hand an encoder `data()` bytes: premultiplied values
+     written as straight ones darken every semi-transparent pixel.
+   - Unit-test both paths against a **semi-transparent fixture**, not just an opaque one. An opaque
+     fixture passes under either mistake, which is exactly how this class of bug survives review.
+
 3. **PNG is cheaper than raw RGB _and_ 13× smaller on the wire** — the encode costs less than the
    RGBA→RGB conversion it replaces. So `png` is the preferred format to negotiate whenever a client
    can decode it, and `rgb` is the compatibility path rather than the fast path. Worth telling client
@@ -415,7 +432,37 @@ logs and in the admin view are shown hashed (`ip:ab12cd`). Full session detail r
 ### 9.5 Operations
 
 - Structured logging (`pino`), payloads truncated, no bitmaps in logs.
-- `/healthz`; optional `/metrics` gated behind an admin token.
+- `/healthz` on the public listener — up/down only, no detail, since anyone can reach it.
+- **Prometheus metrics on their own listener**, never the public one. Two independent defences,
+  because one mistyped proxy rule should not expose operational internals:
+
+  1. A separate port (`METRICS_PORT`, default 16625) bound to `METRICS_BIND` (default `127.0.0.1`;
+     `0.0.0.0` under compose so a sidecar Prometheus on the same network can reach it). Nothing
+     publishes it to the host, and the Caddyfile has **no route to it at all** — so there is no
+     proxy rule to get wrong.
+  2. An optional `METRICS_TOKEN`. When set, `/metrics` requires `Authorization: Bearer …` and answers
+     **404** rather than 401 otherwise, so a prober cannot confirm the endpoint exists.
+
+  Scraping from outside the host means exposing the port and setting the token; the Caddyfile carries
+  a commented token-gated block for that. Blocking it at Caddy instead is equally fine — the separate
+  port means the default is already closed either way.
+
+  What to export (`prom-client`, plus its default process/GC collectors):
+
+  | Metric                                         | Type      | Why                                           |
+  | ---------------------------------------------- | --------- | --------------------------------------------- |
+  | `satellite_connections{transport}`             | gauge     | current connections                           |
+  | `satellite_connections_total{transport}`       | counter   | churn — reconnect storms show up here         |
+  | `satellite_sessions{state}`                    | gauge     | unclaimed / claimed / orphaned                |
+  | `satellite_messages_total{direction,command}`  | counter   | protocol mix; catches a client hot-looping    |
+  | `satellite_bytes_total{direction}`             | counter   | bandwidth — the thing most worth alerting on  |
+  | `satellite_render_duration_seconds{format}`    | histogram | the spike's numbers, in production            |
+  | `satellite_render_cache_total{result}`         | counter   | hit/miss; cache health is the whole CPU story |
+  | `satellite_rate_limit_rejections_total{limit}` | counter   | which cap is actually biting                  |
+  | `satellite_claim_attempts_total{result}`       | counter   | brute-force attempts against claim codes      |
+  | `satellite_scenario_active{scenario}`          | gauge     | what the demo instance is actually doing      |
+  | `nodejs_eventloop_lag_seconds`                 | summary   | the canary for blocking encode work           |
+
 - Optional `/admin` (token from env): global stats, kill a connection, temp-ban an IP, maintenance
   mode. Cheap insurance for a public instance.
 - Container: non-root, read-only rootfs, no added capabilities, `--init`, memory/CPU limits,

@@ -13,4 +13,21 @@ satellite-mock.example.com {
 	handle {
 		reverse_proxy satellite-mock:16624
 	}
+
+	# Note there is deliberately NO route to the metrics listener (:16625). It is a separate port
+	# bound inside the compose network, so the public origin has no path to it at all — there is no
+	# rule here to get wrong. Scrape it from a Prometheus on the same network.
+	#
+	# If it must be scraped from outside, expose it explicitly and require the bearer token, rather
+	# than relying on the path being unguessable:
+	#
+	#   handle /metrics {
+	#       @authorised header Authorization "Bearer {env.METRICS_TOKEN}"
+	#       handle @authorised {
+	#           reverse_proxy satellite-mock:16625
+	#       }
+	#       respond 404
+	#   }
+	#
+	# (404 rather than 401, so an unauthenticated prober cannot tell the endpoint exists.)
 }

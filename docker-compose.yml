@@ -14,7 +14,14 @@ services:
       # spoofed by clients — see docs/design.md §9.3.
       TRUSTED_PROXY_HOPS: 1
       PUBLIC_ORIGIN: https://satellite-mock.example.com
-    expose: ['16623', '16624']
+      # Metrics listen on their own port, bound to all interfaces *within the compose network* so a
+      # sidecar Prometheus can reach them. Nothing publishes this port to the host and Caddy has no
+      # route to it. Set METRICS_TOKEN as well if the network itself is not trusted.
+      METRICS_BIND: 0.0.0.0
+      METRICS_PORT: 16625
+      # METRICS_TOKEN: ${METRICS_TOKEN}
+    # `expose` (not `ports`) — reachable from sibling containers, never from the host or the internet.
+    expose: ['16623', '16624', '16625']
 
   caddy:
     image: caddy:2-alpine
