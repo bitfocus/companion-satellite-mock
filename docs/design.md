@@ -71,8 +71,15 @@ see a working, interactive, self-explanatory surface.
 - A **session** corresponds to one *connection*, keyed for continuity by its **primary device id**
   (the first `ADD-DEVICE` on that connection).
 - Reconnecting with the same primary device id rebinds to the existing session within a grace
-  window (default 10 min), restoring its scenario, chaos settings, protocol profile and claim.
-  This makes reconnect testing painless and gives per-device sticky settings.
+  window, restoring its scenario, chaos settings, protocol profile and claim — so the claim survives
+  a reconnect and the surface does not bounce back to Unclaimed. The target is gaps of a minute or
+  less (app backgrounded, network flap, an *Apply & bounce* version change); the default window is
+  10 min, which is generous for that and still cheap, since a session is a few KB of memory and a
+  ring buffer. Nothing is persisted — a server restart legitimately drops everything, and clients
+  reconnect into fresh Unclaimed sessions.
+- This does mean the **client must keep its `DEVICEID` stable across reconnects**. One that mints a
+  new id per launch gets a new session and a new claim code every time; the UI calls that out when
+  it sees a session go idle and an identical-looking device appear beside it.
 - The claim code is stable for the lifetime of the session and rotates on unclaim.
 - A session has **zero or one controller** (a browser, identified by an opaque `uiClientId` in
   `localStorage`). Others may not view it at all: full session detail — including the trace, which
@@ -236,7 +243,10 @@ shows which features the connected client actually negotiated, and greys out wha
     copy/export.
   - **Connection info**: transport, negotiated `CAPS`, decoded `ADD-DEVICE` params (pretty-printed
     manifest / config fields / variables), API version in force, `PING`/`PONG` RTT sparkline, byte
-    and message counters, remaining rate-limit budget.
+    and message counters, remaining rate-limit budget. Also the **received-only signals that produce
+    no visible effect on the wire** — chiefly `FIRMWARE-UPDATE-INFO`'s `UPDATE_URL` (shown as inert
+    text with its timestamp) and `CHANGE-PAGE` requests. Companion answers both with a bare `OK`, so
+    this panel is the only way a client author can prove they were sent correctly.
   - **Sidebar**: scenario picker + per-scenario params, protocol profile, chaos panel, raw sender.
 - **About / help** — protocol notes, links, version.
 
@@ -305,13 +315,19 @@ not protected.
 
 **No user-controlled egress.** The server never fetches a URL, resolves a hostname, or opens an
 outbound connection on any user input. In particular `FIRMWARE-UPDATE-INFO`'s `UPDATE_URL` is stored
-and displayed as inert text and never fetched or linkified. Enforce it as an invariant: no HTTP
+and displayed as inert, non-clickable text and never fetched. Enforce it as an invariant: no HTTP
 client dependency in `packages/server`, and a lint rule/test asserting that.
 
-**No relaying between sessions.** Data flows client → its own session → its controller browser and
-back. Nothing a client sends reaches another session. So the server cannot be used as a chat relay,
-file drop or CDN. The one theoretical channel — a claimed session's raw sender — is capped in
-length and rate and requires holding the claim code.
+**Relaying is confined to one session's two parties.** Data flows client → its own session → its
+controller browser and back, and those two are on different IPs by design, so this *is* a
+cross-network relay of a limited kind — the trace carries what the client sent to the browser, and
+the raw sender carries browser-composed lines to the client. It is not worth pretending otherwise.
+What makes it unattractive rather than impossible: both ends must share a claim code, a session
+carries no storage and dies minutes after disconnect, only one browser controls a session at a time,
+and both directions sit under the size and rate caps in §9.2 (the raw sender is capped at 4 KB per
+line and rate limited). Nothing a client sends ever reaches a *different* session, so it cannot be
+used as a broadcast relay, file drop or CDN. Anyone wanting a data channel between two hosts has far
+better options; the mitigation here is the caps, not a claim of impossibility.
 
 ### 9.2 Limits
 

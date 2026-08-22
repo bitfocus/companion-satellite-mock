@@ -16,7 +16,7 @@ Status: **design only**. Nothing is implemented yet.
 
 | Doc | Contents |
 |---|---|
-| [`docs/protocol.md`](docs/protocol.md) | Working reference for Satellite API **1.14.0**, read from the Companion source. The public wiki stops at 1.8.0. |
+| [`docs/protocol.md`](docs/protocol.md) | Implementation notes that complement the [official spec](https://companion.free/for-developers/Satellite-API): wire quirks, exact bounds and error strings, liveness timing, and the version→capability matrix. |
 | [`docs/design.md`](docs/design.md) | System design: pairing workflow, architecture, demo scenarios, test tooling, security model. |
 | [`docs/implementation-plan.md`](docs/implementation-plan.md) | Phased build order with deliverables and acceptance criteria. |
 

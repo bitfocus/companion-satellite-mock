@@ -35,22 +35,24 @@ button on the target architecture.
 The core asset. No I/O, no timers.
 
 1. `parseLine` — port of upstream `parseLineParameters` with every quirk from
-   [protocol.md §10](./protocol.md#10-quirk-checklist-for-the-mock).
+   [protocol.md §1](./protocol.md#1-wire-quirks).
 2. `serialise` — `sendMessage` equivalent, trailing-space quirk on by default and toggleable,
    `\n`/`\r\n` selectable.
-3. Zod schemas: `ADD-DEVICE` params, `LAYOUT_MANIFEST`, `CONFIG_FIELDS`, `VARIABLES`, plus the
-   inbound command shapes. Decoders that size-check base64 before decoding and JSON before parsing.
-4. `ApiVersionProfile` — the version→capability table (1.0.0 … 1.14.0) with `capabilitiesFor(v)`
+3. Schemas: generate types for `LAYOUT_MANIFEST` and `CONFIG_FIELDS` from the published
+   `satellite-surface.schema.json` / `satellite-config-fields.schema.json` assets rather than
+   retyping them; hand-write zod for `ADD-DEVICE` params, `VARIABLES` and the inbound command shapes. Decoders that size-check base64 before decoding and JSON before parsing.
+4. `ApiVersionProfile` — the version→capability table from
+   [protocol.md §6](./protocol.md#6-version--capability-matrix) with `capabilitiesFor(v)`
    returning: accepted commands, permitted `KEY-STATE`/`SUB-STATE` args, `LOCATION` on/off,
    rotation semantics, offered bitmap formats, `CAPS` contents.
 5. Message builders for every outbound message, each gated by a capability profile.
 6. Tests: golden corpus of lines → parses; every error string from
-   [protocol.md §4](./protocol.md#4-response-conventions); a round-trip property test
+   [protocol.md §3](./protocol.md#3-error-strings); a round-trip property test
    (`serialise(parse(x))`); capability-gating tests asserting that e.g. profile 1.6.0 emits no
    `LOCATION` and rejects `ADD-SUB`.
 
-**Done when:** the package has no dependency on `node:net`/`ws`, and its test suite covers all 15
-quirks explicitly.
+**Done when:** the package has no dependency on `node:net`/`ws`, and its test suite covers every
+quirk in [protocol.md §1](./protocol.md#1-wire-quirks) explicitly.
 
 ---
 
@@ -79,7 +81,7 @@ after 5 s of silence, and the caps are demonstrably enforced by a small abuse sc
 2. Reserved-prefix rules, duplicate handling (including the "error goes to the *existing* socket"
    quirk), multiple devices per connection.
 3. `KEY-PRESS`, `KEY-ROTATE`, `PINCODE-KEY`, `SET-VARIABLE-VALUE`, `CHANGE-PAGE`,
-   `FIRMWARE-UPDATE-INFO` (store as inert text), `ADD-SUB`/`REMOVE-SUB`/`SUB-PRESS`/`SUB-ROTATE`.
+   `FIRMWARE-UPDATE-INFO` (store as inert text; the only wire effect is the `OK`, so the web UI must report it), `ADD-SUB`/`REMOVE-SUB`/`SUB-PRESS`/`SUB-ROTATE`.
    Legacy `KEY` parsing accepts both flat index and `row/column`.
 4. Session manager: session per connection keyed by primary device id, claim code generation
    (Crockford base32, 6 chars), claim/unclaim, reconnect rebinding with a grace window, TTLs, GC.
