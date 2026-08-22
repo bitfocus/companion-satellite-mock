@@ -907,7 +907,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@satellite-mock/server@workspace:packages/server":
+"@satellite-mock/server@workspace:*, @satellite-mock/server@workspace:packages/server":
   version: 0.0.0-use.local
   resolution: "@satellite-mock/server@workspace:packages/server"
   dependencies:
@@ -941,6 +941,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@satellite-mock/webui@workspace:packages/webui"
   dependencies:
+    "@satellite-mock/server": "workspace:*"
     "@tanstack/react-query": "npm:^5.87.1"
     "@trpc/client": "npm:^11.5.0"
     "@trpc/server": "npm:^11.5.0"

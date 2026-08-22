@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@satellite-mock/server": "workspace:*",
     "@tanstack/react-query": "^5.87.1",
     "@trpc/client": "^11.5.0",
     "@trpc/tanstack-react-query": "^11.5.0",

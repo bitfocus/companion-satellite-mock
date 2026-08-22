@@ -23,6 +23,14 @@ export interface Subscription {
  * is optional so a bare protocol server — the transport tests, for one — needs none of them.
  */
 export interface SatelliteEvents {
+	/**
+	 * Every line in and out, for the protocol trace.
+	 *
+	 * Separate from the typed events because the trace has to show what actually crossed the wire,
+	 * including malformed input and lines no handler understood — a trace assembled from parsed
+	 * events would hide exactly the cases someone opens a trace to debug.
+	 */
+	onLine?: (session: SatelliteSession, direction: 'in' | 'out', line: string) => void
 	onDeviceAdded?: (session: SatelliteSession, device: Device) => void
 	onDeviceRemoved?: (session: SatelliteSession, device: Device) => void
 	onKeyPress?: (session: SatelliteSession, device: Device, controlId: string, pressed: boolean) => void

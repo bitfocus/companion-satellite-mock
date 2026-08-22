@@ -157,14 +157,60 @@ describe('SessionManager sweeping', () => {
 })
 
 describe('MockSession trace', () => {
+	it('counts keepalives instead of tracing them', () => {
+		// At 10Hz, tracing pings evicts every useful line from the ring buffer within seconds. That
+		// was visible the first time a real trace was opened: it was nothing but PING/PONG, and
+		// filtering in the UI did not help because the real traffic had already been evicted.
+		const clock = fakeClock()
+		const manager = new SessionManager({ graceMs: GRACE, maxLifetimeMs: LIFETIME, maxTrace: 10, now: clock.now })
+		const session = manager.create()
+
+		for (let i = 0; i < 100; i++) {
+			session.record('in', 'PING')
+			session.record('out', 'PONG')
+		}
+		session.record('in', 'KEY-PRESS DEVICEID="dev1" KEY=0 PRESSED=1')
+
+		expect(session.trace).toHaveLength(1)
+		expect(session.trace[0]!.line).toContain('KEY-PRESS')
+		expect(session.keepalivesIn).toBe(100)
+		expect(session.keepalivesOut).toBe(100)
+		expect(session.lastKeepaliveAt).toBeDefined()
+	})
+
+	it("strips the terminator and Companion's trailing space", () => {
+		const manager = new SessionManager({ graceMs: GRACE, maxLifetimeMs: LIFETIME, now: fakeClock().now })
+		const session = manager.create()
+		session.record('out', 'KEYS-CLEAR DEVICEID="dev1" \n')
+		expect(session.trace[0]!.line).toBe('KEYS-CLEAR DEVICEID="dev1"')
+	})
+
+	it('elides a bitmap payload, which would otherwise be 20KB of base64 per line', () => {
+		const manager = new SessionManager({ graceMs: GRACE, maxLifetimeMs: LIFETIME, now: fakeClock().now })
+		const session = manager.create()
+		session.record('out', `KEY-STATE KEY=0 BITMAP="${'A'.repeat(20000)}" \n`)
+
+		const line = session.trace[0]!.line
+		expect(line.length).toBeLessThan(120)
+		expect(line).toContain('BITMAP=<20000 chars>')
+	})
+
+	it('traces a command whose name merely starts with the same letters', () => {
+		const manager = new SessionManager({ graceMs: GRACE, maxLifetimeMs: LIFETIME, now: fakeClock().now })
+		const session = manager.create()
+		session.record('in', 'PINCODE-KEY DEVICEID="dev1" KEY=1')
+		expect(session.trace).toHaveLength(1)
+	})
+
 	it('is a fixed-size ring buffer, so a chatty client cannot grow it', () => {
 		const clock = fakeClock()
 		const manager = new SessionManager({ graceMs: GRACE, maxLifetimeMs: LIFETIME, maxTrace: 10, now: clock.now })
 		const session = manager.create()
-		for (let i = 0; i < 100; i++) session.record('in', `PING ${i}`)
+		// Not PING: those are counted rather than traced, so they would never fill the buffer.
+		for (let i = 0; i < 100; i++) session.record('in', `KEY-PRESS KEY=${i}`)
 
 		expect(session.trace).toHaveLength(10)
-		expect(session.trace[0]!.line).toBe('PING 90')
-		expect(session.trace.at(-1)!.line).toBe('PING 99')
+		expect(session.trace[0]!.line).toBe('KEY-PRESS KEY=90')
+		expect(session.trace.at(-1)!.line).toBe('KEY-PRESS KEY=99')
 	})
 })

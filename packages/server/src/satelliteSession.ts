@@ -120,15 +120,21 @@ export class SatelliteSession {
 		return removed
 	}
 
+	/** Send a line and record it in the trace. All outbound traffic goes through here. */
+	send(line: string): void {
+		this.connection.send(line)
+		this.events.onLine?.(this, 'out', line)
+	}
+
 	/** Send `BEGIN`, and `CAPS` if the advertised version is new enough to have it. */
 	sendHandshake(): void {
 		const handshake = {
 			companionVersion: this.#config.COMPANION_VERSION,
 			subscriptionsEnabled: this.#subscriptionsEnabled,
 		}
-		this.connection.send(buildBegin(this.capabilities, handshake))
+		this.send(buildBegin(this.capabilities, handshake))
 		const caps = buildCaps(this.capabilities, handshake)
-		if (caps) this.connection.send(caps)
+		if (caps) this.send(caps)
 	}
 
 	get lastReceivedAt(): number {
@@ -166,7 +172,9 @@ export class SatelliteSession {
 
 		const { lines, overflow } = this.#buffer.push(chunk)
 		for (const line of lines) {
-			this.#handleLine(normaliseLine(line))
+			const normalised = normaliseLine(line)
+			this.events.onLine?.(this, 'in', normalised)
+			this.#handleLine(normalised)
 			if (this.#closed) return
 		}
 
@@ -185,7 +193,7 @@ export class SatelliteSession {
 		// Skip the parse for PING: its payload is the raw remainder, and it is by far the most
 		// frequent message on the wire.
 		if (upper === 'PING') {
-			this.connection.send(buildPong(body))
+			this.send(buildPong(body))
 			return
 		}
 		if (upper === 'PONG') return
@@ -199,7 +207,7 @@ export class SatelliteSession {
 			this.#logger.debug({ line: truncate(line) }, 'unknown command')
 			// `ERROR MESSAGE="…"` — no status token. Distinct from the doubled-ERROR line-too-long
 			// case below, which upstream emits with both a message name and a status of ERROR.
-			this.connection.send(serialiseMessage('ERROR', null, null, { MESSAGE: unknownCommandError(upper) }))
+			this.send(serialiseMessage('ERROR', null, null, { MESSAGE: unknownCommandError(upper) }))
 			return
 		}
 
@@ -211,7 +219,7 @@ export class SatelliteSession {
 	}
 
 	#sendError(messageName: string, message: string): void {
-		this.connection.send(serialiseError(messageName, null, message))
+		this.send(serialiseError(messageName, null, message))
 	}
 
 	close(): void {

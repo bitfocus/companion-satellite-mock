@@ -14,6 +14,20 @@ export interface TraceEntry {
 export type MockSessionState = 'unclaimed' | 'claimed' | 'offline'
 
 /**
+ * Prepare a line for display in the trace.
+ *
+ * Two things: the terminator and Companion's trailing space are stripped, because they are noise in
+ * a list of lines and nobody is debugging whitespace here; and a bitmap payload is replaced with its
+ * size, because 20KB of base64 per line makes the trace unreadable and unbounded in the browser.
+ */
+export function formatForTrace(line: string): string {
+	return line
+		.replace(/\r?\n$/, '')
+		.replace(/\s+$/, '')
+		.replace(/BITMAP="?([^" ]{64,})"?/, (_match, payload: string) => `BITMAP=<${payload.length} chars>`)
+}
+
+/**
  * A UI-facing session: everything the operator controls for one connected client.
  *
  * Keyed for continuity by the *primary device id* — the first device the connection registers — so
@@ -37,6 +51,19 @@ export class MockSession {
 
 	readonly trace: TraceEntry[] = []
 
+	/**
+	 * Keepalives are counted, not traced.
+	 *
+	 * The reference client pings at 10Hz, so recording them would evict every useful line from a
+	 * bounded ring buffer within seconds — filtering them out in the UI does not help, because by
+	 * then the real traffic is already gone. What a client author actually wants from a ping is
+	 * whether it is arriving and how often, which a counter answers better than 20 identical lines
+	 * a second.
+	 */
+	keepalivesIn = 0
+	keepalivesOut = 0
+	lastKeepaliveAt: number | undefined
+
 	constructor(
 		private readonly maxTrace: number,
 		private readonly now: Clock = Date.now
@@ -51,7 +78,16 @@ export class MockSession {
 	}
 
 	/** Append to the trace ring buffer, which is fixed-size so a chatty client cannot grow it. */
-	record(direction: 'in' | 'out', line: string): void {
+	record(direction: 'in' | 'out', rawLine: string): void {
+		const line = formatForTrace(rawLine)
+		const command = line.split(' ')[0]?.toUpperCase()
+		if (command === 'PING' || command === 'PONG') {
+			if (direction === 'in') this.keepalivesIn++
+			else this.keepalivesOut++
+			this.lastKeepaliveAt = this.now()
+			return
+		}
+
 		this.trace.push({ at: this.now(), direction, line })
 		if (this.trace.length > this.maxTrace) this.trace.splice(0, this.trace.length - this.maxTrace)
 	}
@@ -107,6 +143,13 @@ export class SessionManager {
 	/** Continuity index: primary device id → session. */
 	readonly #byPrimaryDevice = new Map<string, MockSession>()
 	readonly #claimBuckets = new Map<string, TokenBucket>()
+	/**
+	 * Reverse index from live connection to session.
+	 *
+	 * The trace hook runs for every line, and the reference client pings at 10Hz — scanning every
+	 * session per line would be quadratic in connection count on the hottest path there is.
+	 */
+	readonly #byConnection = new WeakMap<SatelliteSession, MockSession>()
 
 	readonly #graceMs: number
 	readonly #maxLifetimeMs: number
@@ -153,6 +196,7 @@ export class SessionManager {
 		if (existing) {
 			existing.connection = connection
 			existing.disconnectedAt = undefined
+			this.#byConnection.set(connection, existing)
 			return existing
 		}
 
@@ -160,12 +204,19 @@ export class SessionManager {
 		session.primaryDeviceId = primaryDeviceId
 		session.connection = connection
 		this.#byPrimaryDevice.set(primaryDeviceId, session)
+		this.#byConnection.set(connection, session)
 		return session
 	}
 
 	detach(session: MockSession): void {
+		if (session.connection) this.#byConnection.delete(session.connection)
 		session.connection = undefined
 		session.disconnectedAt = this.#now()
+	}
+
+	/** O(1) lookup for the trace hook, which runs on every line in and out. */
+	forConnection(connection: SatelliteSession): MockSession | undefined {
+		return this.#byConnection.get(connection)
 	}
 
 	/** Look up by claim code. Rate limited per UI client, and constant-time per candidate. */

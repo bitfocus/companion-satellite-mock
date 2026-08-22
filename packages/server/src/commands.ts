@@ -44,7 +44,7 @@ const MAX_RENDERED_CONTROLS = 512
 const MAX_BITMAP_DIMENSION = 512
 
 function fail(session: SatelliteSession, messageName: string, deviceId: string | null, message: string): void {
-	session.connection.send(buildErrorResponse(messageName, deviceId, message, session.capabilities))
+	session.send(buildErrorResponse(messageName, deviceId, message, session.capabilities))
 }
 
 function ok(
@@ -53,7 +53,7 @@ function ok(
 	deviceId: string | null,
 	args: Record<string, string | number | boolean> = {}
 ): void {
-	session.connection.send(buildOk(messageName, deviceId, session.capabilities, args))
+	session.send(buildOk(messageName, deviceId, session.capabilities, args))
 }
 
 /** Decode a base64 JSON parameter, size-checked before decode and before parse. */
@@ -109,6 +109,8 @@ const addDevice: CommandHandler = (context) => {
 		if (existing.connection === session.connection) return fail(session, messageName, id, ERRORS.deviceAlreadyAdded)
 		// Quirk: the error goes to the socket that already holds the device, and the requesting
 		// socket gets no reply at all.
+		// Sent straight to the other connection rather than through its session: we hold the device,
+		// not its session. It therefore does not appear in that session's trace, which is a known gap.
 		existing.connection.send(
 			buildErrorResponse(messageName, id, ERRORS.deviceExistsElsewhere, session.capabilities)
 		)
@@ -395,11 +397,11 @@ const addSub: CommandHandler = (context) => {
 	}
 	session.subscriptions.set(id, subscription)
 
-	session.connection.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
+	session.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
 
 	// Companion pushes the current state straight away — including for a location with no button,
 	// which is a valid subscription that simply renders empty.
-	session.connection.send(
+	session.send(
 		buildSubState({
 			subId: id,
 			values: { pressed: false, type: 'BUTTON' },
@@ -421,7 +423,7 @@ const removeSub: CommandHandler = (context) => {
 	if (!session.subscriptions.has(id)) return fail(session, messageName, null, ERRORS.unknownSubId)
 
 	session.subscriptions.delete(id)
-	session.connection.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
+	session.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
 }
 
 const subPress: CommandHandler = (context) => {
@@ -437,7 +439,7 @@ const subPress: CommandHandler = (context) => {
 
 	if (!params.PRESSED) return fail(session, messageName, null, ERRORS.missingPressed)
 	session.events.onSubPress?.(session, subscription, !isFalsey(params.PRESSED))
-	session.connection.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
+	session.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
 }
 
 const subRotate: CommandHandler = (context) => {
@@ -454,7 +456,7 @@ const subRotate: CommandHandler = (context) => {
 	if (!params.DIRECTION) return fail(session, messageName, null, ERRORS.missingDirection)
 	const delta = parseRotationDelta(params.DIRECTION, session.capabilities.rotaryAmount)
 	session.events.onSubRotate?.(session, subscription, delta)
-	session.connection.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
+	session.send(buildOk(messageName, null, session.capabilities, { SUBID: id }))
 }
 
 /**

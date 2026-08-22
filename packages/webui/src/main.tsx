@@ -1,14 +1,12 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { App } from './App.js'
+import './style.css'
 
-// Placeholder. Phase 7 builds the real UI.
-function App() {
-	return <h1>Satellite Mock</h1>
-}
+const element = document.getElementById('root')
+if (!element) throw new Error('missing #root')
 
-const el = document.getElementById('root')
-if (!el) throw new Error('missing #root')
-createRoot(el).render(
+createRoot(element).render(
 	<StrictMode>
 		<App />
 	</StrictMode>

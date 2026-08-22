@@ -122,6 +122,9 @@ export class MockRuntime {
 				this.#logger.warn({ device: device.id }, 'send queue overflowed, closing connection')
 				connection.close()
 			},
+			// Without this the trace shows the handshake and input but never a single KEY-STATE,
+			// which is most of what a client author wants to see.
+			trace: (line) => session.record('out', line),
 		})
 
 		this.#devices.set(device.id, { device, emitter, session, budget })

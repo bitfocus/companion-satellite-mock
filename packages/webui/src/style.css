@@ -1,0 +1,274 @@
+/* Dark by default: this sits next to a lit control surface, and a white page washes it out. */
+:root {
+	--bg: #0e0e12;
+	--panel: #17171e;
+	--line: #262630;
+	--text: #e6e6ee;
+	--muted: #8a8a9a;
+	--accent: #8a2be2;
+	--ok: #2e9e4f;
+	--warn: #b8860b;
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font:
+		14px/1.5 ui-sans-serif,
+		system-ui,
+		-apple-system,
+		sans-serif;
+}
+
+h1 {
+	font-size: 1.6rem;
+	margin: 0 0 0.5rem;
+}
+h2 {
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--muted);
+	margin: 0 0 0.75rem;
+}
+
+.card {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	padding: 1rem;
+	margin-bottom: 1rem;
+}
+
+.claim {
+	max-width: 44rem;
+	margin: 0 auto;
+	padding: 3rem 1.5rem;
+}
+.lede {
+	color: var(--muted);
+	margin-bottom: 2rem;
+}
+.url {
+	display: block;
+	background: #000;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	padding: 0.75rem;
+	font-size: 1rem;
+	overflow-x: auto;
+}
+.hint {
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+.error {
+	color: #ff6b6b;
+}
+.muted {
+	color: var(--muted);
+	font-weight: normal;
+}
+
+form {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+}
+input {
+	flex: 1;
+	background: #000;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	color: var(--text);
+	padding: 0.6rem 0.75rem;
+	font: inherit;
+}
+button {
+	background: var(--accent);
+	border: 0;
+	border-radius: 6px;
+	color: #fff;
+	padding: 0.6rem 1rem;
+	font: inherit;
+	cursor: pointer;
+}
+button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.session > header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.75rem 1.25rem;
+	border-bottom: 1px solid var(--line);
+	gap: 1rem;
+}
+.session > header > div {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+.badge {
+	font-size: 0.75rem;
+	padding: 0.15rem 0.5rem;
+	border-radius: 999px;
+	background: var(--warn);
+	color: #000;
+}
+.badge.ok {
+	background: var(--ok);
+	color: #fff;
+}
+
+.layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 22rem;
+	gap: 1rem;
+	padding: 1rem 1.25rem;
+	align-items: start;
+}
+@media (max-width: 60rem) {
+	.layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.grid {
+	display: grid;
+	gap: 0.4rem;
+}
+.tile {
+	margin: 0;
+	background: #000;
+	border: 2px solid transparent;
+	border-radius: 6px;
+	overflow: hidden;
+}
+.tile.pressed {
+	border-color: #fff;
+}
+.tile img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 1;
+	object-fit: contain;
+	image-rendering: pixelated;
+}
+.tile figcaption {
+	display: flex;
+	justify-content: space-between;
+	font-size: 0.65rem;
+	color: var(--muted);
+	padding: 0.15rem 0.3rem;
+}
+
+.toolbar {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+	flex-wrap: wrap;
+}
+.toolbar input {
+	min-width: 8rem;
+}
+
+.trace {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	max-height: 22rem;
+	overflow: auto;
+	font-family: ui-monospace, monospace;
+	font-size: 0.75rem;
+}
+.trace li {
+	display: flex;
+	gap: 0.5rem;
+	padding: 0.1rem 0;
+	border-bottom: 1px solid #1d1d26;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+.trace .dir {
+	flex: none;
+	width: 1rem;
+	text-align: center;
+}
+.trace li.in .dir {
+	color: #6fa8dc;
+}
+.trace li.out .dir {
+	color: #b6d7a8;
+}
+
+.scenarios {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 0.4rem;
+}
+button.scenario {
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: #1f1f28;
+	color: var(--text);
+	padding: 0.5rem 0.65rem;
+}
+button.scenario.active {
+	background: var(--accent);
+}
+button.scenario span {
+	display: block;
+	font-size: 0.75rem;
+	color: var(--muted);
+	margin-top: 0.15rem;
+}
+button.scenario.active span {
+	color: #e9dcff;
+}
+
+.facts {
+	display: grid;
+	grid-template-columns: 8rem minmax(0, 1fr);
+	gap: 0.25rem 0.75rem;
+	margin: 0;
+	font-size: 0.8rem;
+}
+.facts dt {
+	color: var(--muted);
+}
+.facts dd {
+	margin: 0;
+	word-break: break-word;
+}
+.inert {
+	font-family: ui-monospace, monospace;
+	background: #000;
+	padding: 0.1rem 0.3rem;
+	border-radius: 4px;
+}
+
+.toast {
+	background: #1f1f28;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.8rem;
+}
+
+button.off {
+	background: #2a2a34;
+	color: var(--muted);
+}

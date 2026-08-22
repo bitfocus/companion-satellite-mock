@@ -231,7 +231,7 @@ which is where their UI lives.
 
 ---
 
-## Phase 7 — tRPC API and web UI (L)
+## Phase 7 — tRPC API and web UI (L) — ✅ done
 
 1. tRPC v11 router over `/ws/trpc` with `Origin` checking, zod inputs everywhere, per-client and
    per-IP mutation rate limits:
@@ -250,6 +250,22 @@ which is where their UI lives.
 
 **Done when:** claim → pick scenario → watch the mirror update in step with the real device works
 end to end.
+
+**Outcome.** 398 tests, plus the whole thing driven in a real browser against a real client: claim
+with the code drawn on the surface, 32 live tiles, scenario switching, protocol trace, no console
+errors. Metrics landed here too rather than waiting for Phase 10, since the listener is where they
+belong.
+
+**Two bugs that only showed up by looking at it**, which no unit test would have caught:
+
+1. The trace was **100% PING/PONG**. The reference client pings at 10Hz, so keepalives are 20 lines
+   a second. Filtering them in the UI was the wrong fix — the ring buffer had already evicted the
+   real traffic by then. Keepalives are now counted rather than traced, and the count plus time
+   since the last one is shown in the sidebar, which is what a client author actually wants from a
+   ping anyway.
+2. **`KEY-STATE` never appeared in the trace at all** — the emitter's trace hook was never wired up,
+   so the trace showed the handshake and input but no drawing, which is most of what there is to
+   see.
 
 ---
 

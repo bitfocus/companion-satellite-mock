@@ -28,6 +28,8 @@ export interface EmitterOptions {
 	maxQueuedBytes?: number
 	rotation?: Rotation
 	onOverflow?: () => void
+	/** Called for every line sent, so drawing shows up in the session's protocol trace. */
+	trace?: (line: string) => void
 }
 
 /**
@@ -52,6 +54,7 @@ export class SurfaceEmitter {
 	readonly #maxQueuedBytes: number
 	readonly #rotation: Rotation
 	readonly #onOverflow: (() => void) | undefined
+	readonly #trace: ((line: string) => void) | undefined
 
 	/** Current style per control, so a partial update can be merged onto what is already shown. */
 	readonly #styles = new Map<string, ButtonStyle>()
@@ -70,6 +73,12 @@ export class SurfaceEmitter {
 		this.#maxQueuedBytes = options.maxQueuedBytes ?? 4 * 1024 * 1024
 		this.#rotation = options.rotation ?? 0
 		this.#onOverflow = options.onOverflow
+		this.#trace = options.trace
+	}
+
+	#send(line: string): void {
+		this.#connection.send(line)
+		this.#trace?.(line)
 	}
 
 	get stats(): { sent: number; coalesced: number; pending: number } {
@@ -118,7 +127,7 @@ export class SurfaceEmitter {
 			const args = this.#buildArgs(controlId, style)
 			if (!args) continue
 
-			this.#connection.send(
+			this.#send(
 				buildKeyState({
 					deviceId: this.#device.id,
 					...(this.#device.surface.fromManifest
@@ -184,18 +193,18 @@ export class SurfaceEmitter {
 	clearKeys(): void {
 		this.#pending.clear()
 		this.#styles.clear()
-		this.#connection.send(buildKeysClear(this.#device.id))
+		this.#send(buildKeysClear(this.#device.id))
 	}
 
 	setBrightness(value: number): void {
 		// A device that opted out gets no brightness messages at all, per the 1.7 opt-out.
 		if (!this.#device.supportsBrightness) return
-		this.#connection.send(buildBrightness(this.#device.id, Math.max(0, Math.min(100, Math.round(value)))))
+		this.#send(buildBrightness(this.#device.id, Math.max(0, Math.min(100, Math.round(value)))))
 	}
 
 	setLocked(locked: boolean, characterCount: number, rotation: 0 | 90 | -90 | 180 = 0): void {
 		if (!this.#device.supportsLockedState) return
-		this.#connection.send(
+		this.#send(
 			buildLockedState({
 				deviceId: this.#device.id,
 				locked,
@@ -210,12 +219,12 @@ export class SurfaceEmitter {
 		// Only variables the client declared as outputs are streamed to it.
 		const declared = this.#device.variables.find((v) => v.id === variable && v.type === 'output')
 		if (!declared) return
-		this.#connection.send(buildVariableValue(this.#device.id, variable, value))
+		this.#send(buildVariableValue(this.#device.id, variable, value))
 	}
 
 	sendDeviceConfig(config: Record<string, unknown>): void {
 		if (!this.#device.configFields) return
-		this.#connection.send(buildDeviceConfig(this.#device.id, config))
+		this.#send(buildDeviceConfig(this.#device.id, config))
 	}
 }
 
