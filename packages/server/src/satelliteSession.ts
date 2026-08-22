@@ -20,6 +20,8 @@ import { truncate } from './logging.js'
 import { TokenBucket } from './limits.js'
 import { LineBuffer } from './transport/lineBuffer.js'
 import type { SatelliteConnection } from './transport/types.js'
+import type { Device, DeviceRegistry } from './devices.js'
+import type { SatelliteEvents, Subscription } from './events.js'
 
 /** A handler for one protocol command. Phase 3 registers the device commands here. */
 export type CommandHandler = (context: CommandContext) => void
@@ -40,6 +42,9 @@ export interface SatelliteSessionOptions {
 	/** Lets the operator disable subscriptions on a version that supports them, as Companion does. */
 	subscriptionsEnabled?: boolean
 	handlers?: Map<string, CommandHandler>
+	/** Server-wide, because device ids are global in Companion — see DeviceRegistry. */
+	devices: DeviceRegistry
+	events?: SatelliteEvents
 	now?: () => number
 }
 
@@ -52,6 +57,10 @@ export interface SatelliteSessionOptions {
 export class SatelliteSession {
 	readonly connection: SatelliteConnection
 	readonly capabilities: SatelliteCapabilities
+	readonly devices: DeviceRegistry
+	readonly events: SatelliteEvents
+	/** Subscriptions are per-connection, not per-device — they exist without any surface at all. */
+	readonly subscriptions = new Map<string, Subscription>()
 
 	readonly #config: Config
 	readonly #logger: Logger
@@ -66,6 +75,8 @@ export class SatelliteSession {
 
 	constructor(options: SatelliteSessionOptions) {
 		this.connection = options.connection
+		this.devices = options.devices
+		this.events = options.events ?? {}
 		this.#config = options.config
 		this.#logger = options.logger
 		this.#now = options.now ?? Date.now
@@ -89,6 +100,25 @@ export class SatelliteSession {
 	}
 
 	readonly #subscriptionsEnabled: boolean
+
+	/**
+	 * Whether subscription commands should work right now.
+	 *
+	 * Two separate conditions, and the distinction matters: the API version decides whether the
+	 * feature *exists*, and the operator toggle decides whether it is *enabled* — which is exactly
+	 * the split `CAPS` exists to express.
+	 */
+	get subscriptionsAvailable(): boolean {
+		return this.capabilities.subscriptions && this.#subscriptionsEnabled
+	}
+
+	/** Drop every device this connection registered. Called once, on close. */
+	cleanup(): Device[] {
+		const removed = this.devices.removeAllFor(this.connection)
+		for (const device of removed) this.events.onDeviceRemoved?.(this, device)
+		this.subscriptions.clear()
+		return removed
+	}
 
 	/** Send `BEGIN`, and `CAPS` if the advertised version is new enough to have it. */
 	sendHandshake(): void {

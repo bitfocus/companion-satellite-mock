@@ -1,15 +1,21 @@
+import { capabilitiesFor, SUPPORTED_API_VERSION } from '@satellite-mock/protocol'
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { Config } from './config.js'
 import { ConnectionRegistry, resolveClientIp } from './limits.js'
 import { hashIp, type Logger } from './logging.js'
-import { SatelliteSession, type CommandHandler } from './satelliteSession.js'
+import { buildCommandHandlers } from './commands.js'
+import { DeviceRegistry } from './devices.js'
+import type { SatelliteEvents } from './events.js'
+import { SatelliteSession } from './satelliteSession.js'
 import { WebSocketConnection } from './transport/wsTransport.js'
 
 export interface SatelliteServerOptions {
 	config: Config
 	logger: Logger
-	handlers?: Map<string, CommandHandler>
+	events?: SatelliteEvents
+	/** Companion exposes this as a user-config toggle, so it can be off on a version that has it. */
+	subscriptionsEnabled?: boolean
 }
 
 /**
@@ -22,8 +28,10 @@ export interface SatelliteServerOptions {
 export class SatelliteServer {
 	readonly #config: Config
 	readonly #logger: Logger
-	readonly #handlers: Map<string, CommandHandler>
+	readonly #events: SatelliteEvents
+	readonly #subscriptionsEnabled: boolean
 	readonly #registry: ConnectionRegistry
+	readonly #devices = new DeviceRegistry()
 	readonly #sessions = new Set<SatelliteSession>()
 
 	#http: Server | undefined
@@ -34,7 +42,8 @@ export class SatelliteServer {
 	constructor(options: SatelliteServerOptions) {
 		this.#config = options.config
 		this.#logger = options.logger.child({ component: 'satellite' })
-		this.#handlers = options.handlers ?? new Map()
+		this.#events = options.events ?? {}
+		this.#subscriptionsEnabled = options.subscriptionsEnabled ?? true
 		this.#registry = new ConnectionRegistry({
 			maxTotal: options.config.MAX_CONNECTIONS_TOTAL,
 			maxPerIp: options.config.MAX_CONNECTIONS_PER_IP,
@@ -45,6 +54,10 @@ export class SatelliteServer {
 
 	get connectionCount(): number {
 		return this.#sessions.size
+	}
+
+	get devices(): DeviceRegistry {
+		return this.#devices
 	}
 
 	get address(): { port: number } | undefined {
@@ -115,7 +128,13 @@ export class SatelliteServer {
 			connection,
 			config: this.#config,
 			logger,
-			handlers: this.#handlers,
+			devices: this.#devices,
+			events: this.#events,
+			subscriptionsEnabled: this.#subscriptionsEnabled,
+			// Built per connection because the command set depends on the advertised version: an
+			// older profile must answer `Unknown command` for a command it predates, exactly as a
+			// server of that vintage would.
+			handlers: buildCommandHandlers(this.#capabilitiesFor()),
 		})
 		this.#sessions.add(session)
 		logger.info({ total: this.#sessions.size }, 'connection opened')
@@ -124,9 +143,13 @@ export class SatelliteServer {
 		// before anything that could throw — otherwise a failed handshake would leak the registry slot.
 		socket.on('close', () => {
 			connection.markClosed()
+			const removed = session.cleanup()
 			this.#sessions.delete(session)
 			this.#registry.release(ip)
-			logger.info({ total: this.#sessions.size, bytesIn: connection.bytesReceived }, 'connection closed')
+			logger.info(
+				{ total: this.#sessions.size, devices: removed.length, bytesIn: connection.bytesReceived },
+				'connection closed'
+			)
 		})
 		socket.on('error', (error) => logger.debug({ err: error }, 'socket error'))
 
@@ -142,6 +165,11 @@ export class SatelliteServer {
 			logger.error({ err: error }, 'handshake failed')
 			session.close()
 		}
+	}
+
+	/** The capability set every new connection starts from. Phase 8 makes this per-device. */
+	#capabilitiesFor() {
+		return capabilitiesFor(SUPPORTED_API_VERSION)
 	}
 
 	#checkLiveness(): void {
