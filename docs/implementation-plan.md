@@ -363,11 +363,6 @@ extras rather than the code; `unclaimed.test.ts` pins it across eight surface si
 
 Stated plainly rather than rounded up.
 
-- **Two scenarios from the catalogue are missing**: a subscriptions demo that streams `SUB-STATE`
-  as page content changes, and a device-config demo that renders a client's `CONFIG_FIELDS` as a
-  form and pushes `DEVICE-CONFIG` back. The _protocol_ side of both is implemented and tested —
-  `ADD-SUB`/`REMOVE-SUB`/`SUB-PRESS`/`SUB-ROTATE` work and push initial state, and `CONFIG_FIELDS`
-  is parsed and surfaced — but neither has a scenario driving it or UI to edit values.
 - **Reconnect-blackout and force-disconnect-with-close-code** chaos tools are not built. Plain force
   disconnect is.
 - **The soak test.** It needs an hour of wall clock to mean anything.

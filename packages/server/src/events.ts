@@ -1,4 +1,5 @@
 import type { SatelliteControlStylePreset, BitmapFormat } from '@satellite-mock/protocol'
+import type { ButtonStyle } from './render/buttonStyle.js'
 import type { Device } from './devices.js'
 import type { SatelliteSession } from './satelliteSession.js'
 
@@ -31,6 +32,16 @@ export interface SatelliteEvents {
 	 * events would hide exactly the cases someone opens a trace to debug.
 	 */
 	onLine?: (session: SatelliteSession, direction: 'in' | 'out', line: string) => void
+
+	/**
+	 * Connection lifecycle, independent of any device.
+	 *
+	 * Needed because a connection can hold subscriptions without ever registering a device —
+	 * subscriptions reference an absolute location, not a surface — so anything tracking "who is
+	 * connected" cannot derive it from devices or from UI sessions.
+	 */
+	onConnectionOpen?: (session: SatelliteSession) => void
+	onConnectionClose?: (session: SatelliteSession) => void
 	onDeviceAdded?: (session: SatelliteSession, device: Device) => void
 	onDeviceRemoved?: (session: SatelliteSession, device: Device) => void
 	onKeyPress?: (session: SatelliteSession, device: Device, controlId: string, pressed: boolean) => void
@@ -40,6 +51,17 @@ export interface SatelliteEvents {
 	onFirmwareUpdateInfo?: (session: SatelliteSession, device: Device, url: string | null) => void
 	onChangePage?: (session: SatelliteSession, device: Device, forward: boolean) => void
 	onSubscriptionAdded?: (session: SatelliteSession, subscription: Subscription) => void
+
+	/**
+	 * What a subscribed location currently shows.
+	 *
+	 * The initial `SUB-STATE` is sent by the command handler, which is the only place that knows the
+	 * subscription was accepted — so it asks for the content rather than a second layer sending a
+	 * follow-up. An earlier version had both doing it, which produced a blank state and then a real
+	 * one, and worked only if the second layer happened to be wired up. Absent, the location is
+	 * blank, which is a valid subscription target.
+	 */
+	resolveSubscriptionContent?: (subscription: Subscription) => ButtonStyle | undefined
 	onSubPress?: (session: SatelliteSession, subscription: Subscription, pressed: boolean) => void
 	onSubRotate?: (session: SatelliteSession, subscription: Subscription, delta: number) => void
 }

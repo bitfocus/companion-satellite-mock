@@ -22,6 +22,20 @@ lists what each scenario wants, and the Device panel shows what your client actu
 | **Attract loop**         | A slow colour sweep for an unattended demo or a screen recording.                                                                                                                                                                                     |
 | **Load sweep**           | The bounded load tool. See below.                                                                                                                                                                                                                     |
 
+## A client has to be able to show the code
+
+The Unclaimed screen draws the claim code onto the surface, so a client must have asked for
+**bitmaps or text** in `ADD-DEVICE` to see it. A client that requested only `COLORS` receives the
+colours but no code, and cannot be claimed from the web UI at all.
+
+That is not much of a restriction in practice — a colours-only surface cannot display anything
+either way — but it is worth knowing while a client is still under development and has not
+implemented text or bitmap rendering yet. Add `TEXT=1` early; it is the cheapest of the three.
+
+The layout adapts to what is available: one character per key on a surface with room to spare, the
+whole code on a single key when there is not, and the optional extras (the server URL, the live
+"press me" button) are dropped before the code is.
+
 ## The load tool, and what it does not tell you
 
 It drives the surface at a capped frame rate for a fixed time, then stops itself.
@@ -36,6 +50,27 @@ render cache, and you would be measuring the cache.
 
 Caps: 30fps, 60 seconds, 512 controls. It also passes through the per-session render budget and the
 connection's byte limits like everything else.
+
+## Two things that are panels rather than scenarios
+
+**Device config** and **subscriptions** were listed in the original catalogue as scenarios, but
+neither fits: a scenario owns a surface and draws to it on a tick, and both of these are driven
+entirely by the operator, on state that is not a surface at all.
+
+- **Device config** renders whatever `CONFIG_FIELDS` your client declared, using Companion's own
+  field schema — so what you see here is what Companion's surface settings would show. Editing a
+  value pushes `DEVICE-CONFIG` back. Values are coerced against the declared field and anything
+  that does not fit is rejected, so a `number` field can never deliver you a string. Note that the
+  server also pushes `DEVICE-CONFIG` once immediately after registration, as Companion does; if
+  your client only handles it in response to a change, that first one will catch you out.
+- **Subscriptions** lists whatever the client registered with `ADD-SUB` and what each one wants
+  (bitmap, colours, text). Subscriptions watch an absolute `page/row/column` rather than a surface,
+  which is why no scenario can drive them: editing the location's content in this panel pushes
+  `SUB-STATE` to every subscription watching it, across every connection.
+
+Both panels are always present. When the client declared no config fields or holds no
+subscriptions, the panel says so rather than disappearing, so you can tell "not supported" apart
+from "not rendered".
 
 ## Writing another one
 

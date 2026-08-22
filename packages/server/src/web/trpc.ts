@@ -86,6 +86,7 @@ function sessionSnapshot(runtime: MockRuntime, sessionId: string) {
 					canChangePage: device.canChangePage ?? null,
 					variables: device.variables,
 					configFields: device.configFields ?? null,
+					configValues: runtime.configValuesFor(device.id),
 					// Inert text. Displayed, never fetched, never linkified — docs/design.md §9.1.
 					firmwareUpdateUrl: device.firmwareUpdateUrl,
 					controls: [...device.surface.controls.values()].map((control) => ({
@@ -291,6 +292,73 @@ export const appRouter = t.router({
 		}
 		return { ok: true }
 	}),
+
+	/** Active subscriptions on this session's connection, with what each location currently shows. */
+	subscriptions: publicProcedure.input(sessionIdInput).query(({ ctx, input }) => {
+		const session = requireClaimed(ctx, input.sessionId)
+		if (!session.connection) return []
+
+		return [...session.connection.subscriptions.values()].map((subscription) => {
+			const location = `${subscription.location.pageNumber}/${subscription.location.row}/${subscription.location.column}`
+			const style = ctx.runtime.pages.get(location)
+			return {
+				subId: subscription.subId,
+				location,
+				bitmapFormat: subscription.bitmapFormat,
+				wants: {
+					bitmap: subscription.style.bitmap ?? null,
+					colors: subscription.style.colors ?? null,
+					text: subscription.style.text ?? false,
+					textStyle: subscription.style.textStyle ?? false,
+				},
+				content: { bgColor: style.bgColor, textColor: style.textColor, text: style.text },
+			}
+		})
+	}),
+
+	setPageContent: mutation
+		.input(
+			sessionIdInput.extend({
+				location: z.string().regex(/^\d{1,4}\/\d{1,4}\/\d{1,4}$/, 'Expected page/row/column'),
+				text: z.string().max(256).default(''),
+				bgColor: z
+					.string()
+					.regex(/^#[0-9a-fA-F]{6}$/)
+					.default('#000000'),
+				textColor: z
+					.string()
+					.regex(/^#[0-9a-fA-F]{6}$/)
+					.default('#ffffff'),
+			})
+		)
+		.mutation(({ ctx, input }) => {
+			requireClaimed(ctx, input.sessionId)
+			// Broadcasts to every subscription watching this location, across connections — which is
+			// what the protocol does. It carries no session's private data, only what was typed here.
+			const notified = ctx.runtime.setPageContent(input.location, {
+				text: input.text,
+				bgColor: input.bgColor,
+				textColor: input.textColor,
+			})
+			return { notified }
+		}),
+
+	setConfigValue: mutation
+		.input(
+			sessionIdInput.extend({
+				fieldId: z.string().min(1).max(128),
+				value: z.union([z.string().max(1024), z.number(), z.boolean()]),
+			})
+		)
+		.mutation(({ ctx, input }) => {
+			const session = requireClaimed(ctx, input.sessionId)
+			if (!session.primaryDeviceId) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No device' })
+
+			if (!ctx.runtime.setConfigValue(session.primaryDeviceId, input.fieldId, input.value)) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Not a valid value for that field' })
+			}
+			return { ok: true }
+		}),
 
 	disconnect: mutation.input(sessionIdInput).mutation(({ ctx, input }) => {
 		const session = requireClaimed(ctx, input.sessionId)

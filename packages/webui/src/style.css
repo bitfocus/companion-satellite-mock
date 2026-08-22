@@ -320,3 +320,25 @@ button.off {
 	flex: none;
 	accent-color: var(--accent);
 }
+
+.field small {
+	display: block;
+	color: var(--muted);
+	font-size: 0.7rem;
+	margin-top: 0.15rem;
+}
+.field input {
+	width: 100%;
+}
+
+.subs {
+	list-style: none;
+	margin: 0 0 0.75rem;
+	padding: 0;
+	display: grid;
+	gap: 0.4rem;
+}
+input[type='color'] {
+	padding: 0.15rem;
+	height: 2rem;
+}

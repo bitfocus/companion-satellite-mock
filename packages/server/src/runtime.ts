@@ -1,3 +1,4 @@
+import { coerceConfigValue, defaultConfigValues, type ConfigValue } from '@satellite-mock/protocol'
 import type { Config } from './config.js'
 import type { Device } from './devices.js'
 import { SurfaceEmitter } from './emitter.js'
@@ -10,6 +11,8 @@ import { findScenario, unclaimedScenario } from './scenarios/builtin.js'
 import type { Scenario } from './scenarios/types.js'
 import type { SatelliteSession } from './satelliteSession.js'
 import { SessionManager, type MockSession } from './sessions.js'
+import { locationKey, SubscriptionPages } from './subscriptions.js'
+import type { ButtonStyle } from './render/buttonStyle.js'
 
 export interface RuntimeOptions {
 	config: Config
@@ -23,6 +26,8 @@ interface DeviceRuntime {
 	emitter: SurfaceEmitter
 	session: MockSession
 	budget: RenderBudget
+	/** Current values for the client's declared CONFIG_FIELDS, as Companion's surface settings hold. */
+	configValues: Record<string, ConfigValue>
 }
 
 /**
@@ -37,6 +42,7 @@ export class MockRuntime {
 	readonly sessions: SessionManager
 	readonly scenarios: ScenarioEngine
 	readonly renderer: ButtonRenderer
+	readonly pages: SubscriptionPages
 
 	readonly #config: Config
 	readonly #logger: Logger
@@ -55,6 +61,29 @@ export class MockRuntime {
 			maxLifetimeMs: options.config.MAX_CONNECTION_LIFETIME_MS,
 		})
 		this.scenarios = new ScenarioEngine(this.#logger)
+		// Shared budget: subscriptions render on the same thread as everything else, so they draw
+		// from one ceiling rather than each having their own.
+		this.#subscriptionBudget = new RenderBudget(options.config.MAX_BYTES_PER_SECOND * 4)
+		this.pages = new SubscriptionPages(this.renderer, this.#subscriptionBudget)
+	}
+
+	readonly #subscriptionBudget: RenderBudget
+
+	/**
+	 * Every live connection, tracked directly rather than derived from devices or UI sessions.
+	 *
+	 * A connection may hold subscriptions without ever registering a device, so neither of those is
+	 * a complete list — deriving it from them silently broadcast to nobody.
+	 */
+	readonly #connections = new Set<SatelliteSession>()
+
+	/** Set a virtual page location's content and push it to every subscription watching it. */
+	setPageContent(location: string, style: Partial<ButtonStyle>): number {
+		return this.pages.set(location, style, this.#connections)
+	}
+
+	get connectionCount(): number {
+		return this.#connections.size
 	}
 
 	start(): void {
@@ -90,9 +119,38 @@ export class MockRuntime {
 		return unclaimedScenario(session.claimCode, this.#publicUrl)
 	}
 
+	/** Current config values for a device, for the UI to render. */
+	configValuesFor(deviceId: string): Record<string, ConfigValue> {
+		return this.#devices.get(deviceId)?.configValues ?? {}
+	}
+
+	/**
+	 * Apply an operator's config change and push it to the client.
+	 *
+	 * Values are coerced against the field the client declared and anything that does not fit is
+	 * rejected: the web UI is public and unauthenticated, so this is untrusted input like any other,
+	 * and a client that declared a `number` field should never receive a string.
+	 */
+	setConfigValue(deviceId: string, fieldId: string, value: unknown): boolean {
+		const runtime = this.#devices.get(deviceId)
+		if (!runtime?.device.configFields) return false
+
+		const field = runtime.device.configFields.find((candidate) => candidate.id === fieldId)
+		if (!field) return false
+
+		const coerced = coerceConfigValue(field, value)
+		if (coerced === undefined) return false
+
+		runtime.configValues[fieldId] = coerced
+		runtime.emitter.sendDeviceConfig(runtime.configValues)
+		return true
+	}
+
 	/** The event handlers to hand to the SatelliteServer. */
 	events(): SatelliteEvents {
 		return {
+			onConnectionOpen: (session) => this.#connections.add(session),
+			onConnectionClose: (session) => this.#connections.delete(session),
 			onDeviceAdded: (connection, device) => this.#onDeviceAdded(connection, device),
 			onDeviceRemoved: (_connection, device) => this.#onDeviceRemoved(device),
 			onKeyPress: (_c, device, controlId, pressed) => this.scenarios.press(device.id, controlId, pressed),
@@ -100,6 +158,10 @@ export class MockRuntime {
 			onPincodeKey: (_c, device, digit) => this.scenarios.pincodeKey(device.id, digit),
 			onVariableValue: (_c, device, id, value) => this.scenarios.variable(device.id, id, value),
 			onChangePage: (_c, device, forward) => this.scenarios.changePage(device.id, forward),
+			// The command handler sends the one initial SUB-STATE; it asks here what the location
+			// currently shows. Having a second layer follow up with the real content produced a blank
+			// state and then a real one, and only worked when that layer happened to be wired up.
+			resolveSubscriptionContent: (subscription) => this.pages.get(locationKey(subscription)),
 			onFirmwareUpdateInfo: (_c, device, url) => {
 				// Recorded for the web UI only. Never fetched — see docs/design.md §9.1.
 				this.#logger.info({ device: device.id, hasUrl: url !== null }, 'firmware update info reported')
@@ -127,12 +189,17 @@ export class MockRuntime {
 			trace: (line) => session.record('out', line),
 		})
 
-		this.#devices.set(device.id, { device, emitter, session, budget })
+		const configValues = device.configFields ? defaultConfigValues(device.configFields) : {}
+		this.#devices.set(device.id, { device, emitter, session, budget, configValues })
 
 		// Attach immediately, so a client that connects sees a live surface with no web UI involved.
 		// An already-claimed session keeps whatever it was running before the reconnect.
 		const previous = session.claimedBy ? this.scenarios.get(device.id)?.scenario : undefined
 		this.scenarios.attach(device, emitter, previous ?? this.#unclaimedFor(session))
+
+		// Companion sends DEVICE-CONFIG once immediately after ADD-DEVICE OK, so a client that declared
+		// config fields has values before anyone has touched the UI. See docs/protocol.md §5.
+		if (device.configFields) emitter.sendDeviceConfig(configValues)
 
 		this.#logger.info({ device: device.id, claimCode: session.claimCode }, 'device attached')
 	}

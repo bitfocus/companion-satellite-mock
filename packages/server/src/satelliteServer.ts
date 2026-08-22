@@ -166,6 +166,7 @@ export class SatelliteServer {
 		})
 		this.#chaosByConnection.set(session, connection)
 		this.#sessions.add(session)
+		this.#events.onConnectionOpen?.(session)
 		logger.info({ total: this.#sessions.size }, 'connection opened')
 
 		// Teardown is anchored on 'close', which node guarantees fires exactly once, and is registered
@@ -173,6 +174,7 @@ export class SatelliteServer {
 		socket.on('close', () => {
 			raw.markClosed()
 			const removed = session.cleanup()
+			this.#events.onConnectionClose?.(session)
 			this.#sessions.delete(session)
 			this.#registry.release(ip)
 			logger.info(

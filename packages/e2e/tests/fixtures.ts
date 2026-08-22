@@ -83,10 +83,7 @@ export const test = base.extend<{ stack: Stack }>({
 			const states = await client.waitForCount('KEY-STATE', 8, 15_000)
 			// Read the code off the surface, exactly as a user does — this also asserts the whole
 			// unclaimed path works before any test body runs.
-			const claimCode = states
-				.map((message) => Buffer.from(String(message.params.TEXT ?? ''), 'base64').toString())
-				.filter((text) => text.length === 1)
-				.join('')
+			const claimCode = readClaimCode(states.map((message) => decodeText(message.params.TEXT)))
 
 			await use({ webUrl, satelliteUrl, client, claimCode })
 		} finally {
@@ -97,6 +94,24 @@ export const test = base.extend<{ stack: Stack }>({
 })
 
 export { expect } from '@playwright/test'
+
+export const decodeText = (value: string | true | undefined): string =>
+	typeof value === 'string' ? Buffer.from(value, 'base64').toString() : ''
+
+/**
+ * Read the claim code off whatever the surface drew.
+ *
+ * Two layouts, depending on how many keys are spare: one character per key on a surface with room,
+ * or the whole code on a single key when there is not. A helper that only understands the first
+ * silently returns nothing on a small surface — which is exactly the case the layout bug lived in.
+ */
+export function readClaimCode(texts: string[]): string {
+	const spelled = texts.filter((text) => text.length === 1).join('')
+	if (spelled.length >= 6) return spelled
+
+	const whole = texts.find((text) => /^[0-9A-Z]{3}-?[0-9A-Z]{3}$/.test(text.trim()))
+	return whole ? whole.replace('-', '') : spelled
+}
 
 /** Claim the session in the browser and wait for the surface mirror to appear. */
 export async function claim(page: Page, stack: Stack): Promise<void> {

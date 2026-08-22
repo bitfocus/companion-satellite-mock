@@ -14,6 +14,7 @@ import {
 	parseBitmapFormat,
 	parseKeyParam,
 	parseRotationDelta,
+	parseStringParamWithBooleanFallback,
 	parseTransferableValues,
 	RESERVED_ID_PREFIXES,
 	SatelliteConfigFieldsSchema,
@@ -23,6 +24,7 @@ import {
 	type SatelliteControlStylePreset,
 } from '@satellite-mock/protocol'
 import type { Device } from './devices.js'
+import { DEFAULT_BUTTON_STYLE } from './render/buttonStyle.js'
 import type { CommandContext, CommandHandler, SatelliteSession } from './satelliteSession.js'
 
 /**
@@ -357,9 +359,11 @@ function parseSubStyle(params: ParsedParams): SatelliteControlStylePreset | unde
 		if (isNaN(size) || size < 5) size = 72
 		style.bitmap = { w: size, h: size }
 	}
-	if (params.COLORS !== undefined && isTruthy(params.COLORS)) {
-		style.colors = params.COLORS === 'rgb' ? 'rgb' : 'hex'
-	}
+	// `isTruthy('hex')` is false — it only accepts true/yes/>=1 — so checking it here silently
+	// dropped colours for every `ADD-SUB COLORS=hex`. Upstream uses this helper for both the
+	// surface and the subscription path, and so must we.
+	const colors = parseStringParamWithBooleanFallback(['hex', 'rgb'] as const, 'hex', params.COLORS)
+	if (colors) style.colors = colors
 	style.text = params.TEXT !== undefined && isTruthy(params.TEXT)
 	style.textStyle = params.TEXT_STYLE !== undefined && isTruthy(params.TEXT_STYLE)
 	return style
@@ -401,10 +405,24 @@ const addSub: CommandHandler = (context) => {
 
 	// Companion pushes the current state straight away — including for a location with no button,
 	// which is a valid subscription that simply renders empty.
+	//
+	// The values are always filled in rather than omitted: a client that asked for colours and gets a
+	// SUB-STATE carrying none may reasonably leave the button as it was, so an empty location still
+	// has to say what empty looks like. This is also the *only* initial send — an earlier version had
+	// a second layer following up with the real content, which produced a blank state then a real one
+	// and worked only when that layer happened to be wired up.
+	const content = session.events.resolveSubscriptionContent?.(subscription) ?? DEFAULT_BUTTON_STYLE
 	session.send(
 		buildSubState({
 			subId: id,
-			values: { pressed: false, type: 'BUTTON' },
+			values: {
+				pressed: content.pressed,
+				type: content.type,
+				color: content.bgColor,
+				textColor: content.textColor,
+				text: content.text,
+				fontSize: content.fontSize,
+			},
 			preset: style,
 			caps: session.capabilities,
 		})

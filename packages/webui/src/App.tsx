@@ -3,6 +3,7 @@ import { trpc } from './trpc.js'
 import { SurfaceMirror } from './SurfaceMirror.js'
 import { TracePanel } from './TracePanel.js'
 import { Sidebar } from './Sidebar.js'
+import type { ConfigField } from './DeviceConfigPanel.js'
 
 export interface ControlTile {
 	id: string
@@ -44,7 +45,8 @@ export interface SessionSnapshot {
 		supportsLockedState: false | 'FULL' | 'PARTIAL'
 		canChangePage: string | null
 		variables: { id: string; type: string; name: string; description?: string }[]
-		configFields: unknown[] | null
+		configFields: readonly ConfigField[] | null
+		configValues: Record<string, string | number | boolean>
 		firmwareUpdateUrl: string | null
 		controls: { id: string; row: number; column: number }[]
 	} | null

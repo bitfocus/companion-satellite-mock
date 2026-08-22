@@ -6,6 +6,7 @@
  * See docs/protocol.md and docs/design.md §5.1.
  */
 
+export * from './configValues.js'
 export * from './constants.js'
 export * from './parse.js'
 export * from './serialise.js'

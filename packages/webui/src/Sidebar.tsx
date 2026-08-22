@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { SessionSnapshot } from './App.js'
 import { trpc } from './trpc.js'
 import { ChaosPanel, VersionPanel } from './ChaosPanel.js'
+import { DeviceConfigPanel } from './DeviceConfigPanel.js'
+import { SubscriptionsPanel } from './SubscriptionsPanel.js'
 
 interface ScenarioInfo {
 	id: string
@@ -144,6 +146,14 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 				</form>
 				<p className="hint">Quotes and newlines are refused: they would corrupt the line.</p>
 			</section>
+
+			<DeviceConfigPanel
+				sessionId={session.id}
+				fields={session.device?.configFields ?? null}
+				values={session.device?.configValues ?? {}}
+			/>
+
+			<SubscriptionsPanel sessionId={session.id} />
 
 			<ChaosPanel sessionId={session.id} connected={session.connected} />
 
