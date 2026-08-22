@@ -114,7 +114,7 @@ Two things worth recording:
 
 ---
 
-## Phase 3 — Devices, surfaces and sessions (L) — 🚧 in progress
+## Phase 3 — Devices, surfaces and sessions (L) — ✅ done
 
 1. `ADD-DEVICE`: full validation and error paths, both legacy and manifest registration, normalised
    into the internal `Surface` model. `REMOVE-DEVICE`, `QUIT`.
@@ -130,11 +130,27 @@ Two things worth recording:
 **Done when:** the headless test client (Phase 6a) can register legacy and advanced surfaces, all
 error paths return upstream's exact strings, and disconnect/reconnect restores the same session.
 
-**Progress.** Step 1's surface model is done: legacy and manifest registrations normalise into one
-internal shape, exactly as Companion does internally, so drawing code addresses controls by id and
-only the emitter cares which mode the client used. `parseKeyParam` handles both the flat index and
-`row/column`, including upstream's tolerance of a leading `+`. Remaining: the device registry and
-command handlers (steps 2–3), and the session manager with claim codes (steps 4–5).
+**Outcome.** 321 tests. Legacy and manifest registrations normalise into one internal surface, so
+drawing code addresses controls by id and only the emitter knows which mode the client used. Every
+inbound command is implemented with upstream's validation order and exact error strings, and the
+command map is built per connection from the capability profile — a version that predates a command
+answers `Unknown command`, as a server of that vintage would.
+
+Two upstream quirks are reproduced deliberately, each with a test explaining why: `ADD-DEVICE`
+checks only the resolved `SERIAL` for reserved prefixes (so a reserved `DEVICEID` with a clean
+`SERIAL` is accepted), and a device-id collision reports to the connection that already holds the id
+while the requester gets no reply at all.
+
+Sessions are keyed for continuity by primary device id, so a reconnect lands back in the same
+session with its claim, settings and trace intact. The claim code is six characters of an alphabet
+with `I`, `L`, `O` and `U` removed and input folded, because it is read off a button and typed into
+a browser — the characters people misread matter more than the extra entropy, and the attempt
+limiter is what makes the length sufficient. Comparison is constant time, and unclaiming mints a
+fresh code.
+
+Collection needs *both* ends gone: the client disconnected **and** no browser watching. An operator
+with the tab open keeps a crashed client's session, which is the behaviour that matters
+mid-debugging; the absolute lifetime cap is what stops a forgotten tab holding one open forever.
 
 ---
 

@@ -1,0 +1,211 @@
+import { randomUUID } from 'node:crypto'
+import { claimCodeMatches, generateClaimCode } from './claimCode.js'
+import type { Device } from './devices.js'
+import type { SatelliteSession } from './satelliteSession.js'
+import { TokenBucket, type Clock } from './limits.js'
+
+/** One line of the protocol trace, with payloads already elided. */
+export interface TraceEntry {
+	at: number
+	direction: 'in' | 'out'
+	line: string
+}
+
+export type MockSessionState = 'unclaimed' | 'claimed' | 'offline'
+
+/**
+ * A UI-facing session: everything the operator controls for one connected client.
+ *
+ * Keyed for continuity by the *primary device id* — the first device the connection registers — so
+ * a client that drops and reconnects lands back in the same session with its scenario, settings and
+ * claim intact. That requires the client to keep a stable DEVICEID across reconnects; one that
+ * mints a fresh id per launch gets a new session and a new claim code every time.
+ */
+export class MockSession {
+	readonly id = randomUUID()
+	readonly createdAt: number
+
+	claimCode: string
+	/** The browser holding this session, by its opaque UI client id. */
+	claimedBy: string | undefined
+	/** Live subscribers in the web UI. A session with a watcher is never garbage collected. */
+	watchers = new Set<string>()
+
+	connection: SatelliteSession | undefined
+	primaryDeviceId: string | undefined
+	disconnectedAt: number | undefined
+
+	readonly trace: TraceEntry[] = []
+
+	constructor(
+		private readonly maxTrace: number,
+		private readonly now: Clock = Date.now
+	) {
+		this.createdAt = now()
+		this.claimCode = generateClaimCode()
+	}
+
+	get state(): MockSessionState {
+		if (!this.connection) return 'offline'
+		return this.claimedBy ? 'claimed' : 'unclaimed'
+	}
+
+	/** Append to the trace ring buffer, which is fixed-size so a chatty client cannot grow it. */
+	record(direction: 'in' | 'out', line: string): void {
+		this.trace.push({ at: this.now(), direction, line })
+		if (this.trace.length > this.maxTrace) this.trace.splice(0, this.trace.length - this.maxTrace)
+	}
+
+	claim(uiClientId: string): void {
+		this.claimedBy = uiClientId
+	}
+
+	/** Release the session and mint a fresh code, so the old one cannot be reused. */
+	unclaim(): void {
+		this.claimedBy = undefined
+		this.watchers.clear()
+		this.claimCode = generateClaimCode()
+	}
+
+	/**
+	 * Whether this session may be collected.
+	 *
+	 * The window starts only once *both* ends are gone: the client has disconnected and no browser
+	 * is watching. An operator with the tab open keeps a crashed client's session — with its claim,
+	 * settings and trace — which is the behaviour you want mid-debugging. The absolute lifetime is
+	 * what stops a forgotten tab holding one open indefinitely.
+	 */
+	isCollectable(graceMs: number, maxLifetimeMs: number): boolean {
+		if (this.now() - this.createdAt > maxLifetimeMs) return true
+		if (this.connection) return false
+		if (this.watchers.size > 0) return false
+		return this.disconnectedAt !== undefined && this.now() - this.disconnectedAt > graceMs
+	}
+}
+
+export interface SessionManagerOptions {
+	graceMs: number
+	maxLifetimeMs: number
+	maxTrace?: number
+	maxSessionsPerUiClient?: number
+	claimAttemptsPerMinute?: number
+	now?: Clock
+}
+
+export type ClaimResult =
+	{ ok: true; session: MockSession } | { ok: false; reason: 'not-found' | 'rate-limited' | 'too-many-sessions' }
+
+/**
+ * Owns every session, and the claim-code lookup.
+ *
+ * Claiming is the one place a stranger can act on someone else's session, so it is rate limited per
+ * UI client and the code comparison is constant time. Session contents are explicitly not
+ * confidential — the design says so — but making them trivially enumerable would still be rude.
+ */
+export class SessionManager {
+	readonly #sessions = new Map<string, MockSession>()
+	/** Continuity index: primary device id → session. */
+	readonly #byPrimaryDevice = new Map<string, MockSession>()
+	readonly #claimBuckets = new Map<string, TokenBucket>()
+
+	readonly #graceMs: number
+	readonly #maxLifetimeMs: number
+	readonly #maxTrace: number
+	readonly #maxPerUiClient: number
+	readonly #claimAttemptsPerMinute: number
+	readonly #now: Clock
+
+	constructor(options: SessionManagerOptions) {
+		this.#graceMs = options.graceMs
+		this.#maxLifetimeMs = options.maxLifetimeMs
+		this.#maxTrace = options.maxTrace ?? 2000
+		this.#maxPerUiClient = options.maxSessionsPerUiClient ?? 4
+		this.#claimAttemptsPerMinute = options.claimAttemptsPerMinute ?? 5
+		this.#now = options.now ?? Date.now
+	}
+
+	get size(): number {
+		return this.#sessions.size
+	}
+
+	all(): MockSession[] {
+		return [...this.#sessions.values()]
+	}
+
+	get(id: string): MockSession | undefined {
+		return this.#sessions.get(id)
+	}
+
+	create(): MockSession {
+		const session = new MockSession(this.#maxTrace, this.#now)
+		this.#sessions.set(session.id, session)
+		return session
+	}
+
+	/**
+	 * Bind a connection to a session, reusing the existing one when the primary device id is known.
+	 *
+	 * This is what makes a reconnect invisible to the operator — and why the claim survives a client
+	 * crash, a network flap, or the deliberate bounce the version selector performs.
+	 */
+	attach(connection: SatelliteSession, primaryDeviceId: string): MockSession {
+		const existing = this.#byPrimaryDevice.get(primaryDeviceId)
+		if (existing) {
+			existing.connection = connection
+			existing.disconnectedAt = undefined
+			return existing
+		}
+
+		const session = this.create()
+		session.primaryDeviceId = primaryDeviceId
+		session.connection = connection
+		this.#byPrimaryDevice.set(primaryDeviceId, session)
+		return session
+	}
+
+	detach(session: MockSession): void {
+		session.connection = undefined
+		session.disconnectedAt = this.#now()
+	}
+
+	/** Look up by claim code. Rate limited per UI client, and constant-time per candidate. */
+	claim(code: string, uiClientId: string): ClaimResult {
+		let bucket = this.#claimBuckets.get(uiClientId)
+		if (!bucket) {
+			bucket = new TokenBucket(this.#claimAttemptsPerMinute, this.#claimAttemptsPerMinute / 60, this.#now)
+			this.#claimBuckets.set(uiClientId, bucket)
+		}
+		if (!bucket.take()) return { ok: false, reason: 'rate-limited' }
+
+		const held = this.all().filter((session) => session.claimedBy === uiClientId).length
+		if (held >= this.#maxPerUiClient) return { ok: false, reason: 'too-many-sessions' }
+
+		for (const session of this.#sessions.values()) {
+			if (claimCodeMatches(code, session.claimCode)) {
+				session.claim(uiClientId)
+				return { ok: true, session }
+			}
+		}
+		return { ok: false, reason: 'not-found' }
+	}
+
+	/** Collect sessions nobody is using. Returns how many were removed. */
+	sweep(): number {
+		let removed = 0
+		for (const [id, session] of this.#sessions) {
+			if (session.isCollectable(this.#graceMs, this.#maxLifetimeMs)) {
+				this.#sessions.delete(id)
+				if (session.primaryDeviceId) this.#byPrimaryDevice.delete(session.primaryDeviceId)
+				removed++
+			}
+		}
+		return removed
+	}
+
+	/** Called when a device registers, so the session picks up its continuity key. */
+	noteDevice(session: MockSession, device: Device): void {
+		if (session.primaryDeviceId) return
+		session.primaryDeviceId = device.id
+		this.#byPrimaryDevice.set(device.id, session)
+	}
+}
