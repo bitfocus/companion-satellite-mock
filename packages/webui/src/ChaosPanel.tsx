@@ -61,7 +61,7 @@ export function ChaosPanel({ sessionId, connected }: { sessionId: string; connec
 	}
 
 	return (
-		<section className="card">
+		<section className="card" data-testid="chaos-panel">
 			<h2>Fault injection</h2>
 			{!connected && <p className="hint">Client is offline; settings apply when it reconnects.</p>}
 
@@ -136,7 +136,7 @@ export function VersionPanel({
 	const url = `${protocol}//${location.hostname}/ws/satellite${query ? `?${query}` : ''}`
 
 	return (
-		<section className="card">
+		<section className="card" data-testid="version-panel">
 			<h2>Protocol version</h2>
 			<p className="hint">
 				The version is fixed when the socket opens &mdash; <code>BEGIN</code> is sent before any{' '}

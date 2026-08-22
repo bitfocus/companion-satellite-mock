@@ -22,7 +22,8 @@
     "format:check": "prettier --check .",
     "dev": "yarn workspace @satellite-mock/server dev",
     "check": "yarn format:check && yarn lint && yarn typecheck && yarn test",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test:e2e": "yarn build && yarn workspace @satellite-mock/webui build && yarn workspace @satellite-mock/e2e test"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

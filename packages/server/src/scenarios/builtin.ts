@@ -38,31 +38,52 @@ export function unclaimedScenario(claimCode: string, publicUrl: string): Scenari
 		init(context) {
 			context.drawAll({ bgColor: '#101014', textColor: '#ffffff', text: '' })
 
-			paint(context, 0, { bgColor: '#8a2be2', text: 'UN-\nCLAIMED', textColor: '#ffffff' })
+			// Slots are allocated in priority order and never overlap. An earlier version placed the
+			// URL at `length - 2` and the live button at `length - 1` *after* laying out the code,
+			// which on an 8-key surface overwrote the sixth character — the surface then showed a
+			// five-character code that could not be claimed. Anything optional is only drawn if a
+			// slot is genuinely spare.
+			const total = context.controlIds.length
+			let next = 0
 
-			// One character per key where there is room, otherwise the whole code on one button. A
-			// four-key surface should still be claimable.
-			const codeStart = 1
-			if (context.controlIds.length >= codeStart + claimCode.length + 1) {
-				for (let i = 0; i < claimCode.length; i++) {
-					paint(context, codeStart + i, {
+			const take = (): number | undefined => (next < total ? next++ : undefined)
+
+			const header = take()
+			if (header !== undefined) {
+				paint(context, header, { bgColor: '#8a2be2', text: 'UN-\nCLAIMED', textColor: '#ffffff' })
+			}
+
+			// The code is the one thing that must always fit. One character per key when there is
+			// room for all of them, otherwise the whole code on a single key.
+			if (total - next >= claimCode.length) {
+				for (const character of claimCode) {
+					const slot = take()
+					if (slot === undefined) break
+					paint(context, slot, {
 						bgColor: '#1e3a5f',
 						textColor: '#ffffff',
-						text: claimCode[i] ?? '',
+						text: character,
 						fontSize: 'auto',
 					})
 				}
 			} else {
-				paint(context, codeStart, { bgColor: '#1e3a5f', text: formatted, textColor: '#ffffff' })
+				const slot = take()
+				if (slot !== undefined) {
+					paint(context, slot, { bgColor: '#1e3a5f', text: formatted, textColor: '#ffffff' })
+				}
 			}
 
-			// A couple of buttons that visibly react, so the surface is obviously alive even before
-			// anyone claims it.
-			const liveIndex = context.controlIds.length - 1
-			paint(context, liveIndex, { bgColor: '#005f5f', text: 'PRESS\nME' })
+			// Optional, in decreasing order of usefulness. A surface with no spare keys gets neither,
+			// and still shows a claimable code.
+			const live = take()
+			if (live !== undefined) {
+				context.state.set('liveControl', context.controlIds[live])
+				paint(context, live, { bgColor: '#005f5f', text: 'PRESS\nME' })
+			}
 
-			if (context.controlIds.length > 4) {
-				paint(context, context.controlIds.length - 2, { bgColor: '#3f3f00', text: publicUrl, fontSize: 8 })
+			const urlSlot = take()
+			if (urlSlot !== undefined) {
+				paint(context, urlSlot, { bgColor: '#3f3f00', text: publicUrl, fontSize: 8 })
 			}
 		},
 

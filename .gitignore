@@ -12,3 +12,7 @@ coverage/
 !.yarn/plugins
 !.yarn/versions
 .vite/
+
+# Playwright
+test-results/
+playwright-report/

@@ -28,7 +28,7 @@ export function TracePanel({ entries }: { entries: TraceEntry[] }) {
 	}
 
 	return (
-		<section className="card">
+		<section className="card" data-testid="trace-panel">
 			<h2>
 				Protocol trace <span className="muted">{entries.length} lines</span>
 			</h2>

@@ -340,6 +340,25 @@ serves perfectly healthy-looking black buttons, and `/healthz` cannot tell you.
 
 ---
 
+## Testing
+
+| Suite                            | What it covers                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **vitest** — 469 tests, 26 files | Protocol codec (incl. a differential test against a verbatim copy of upstream's parser over 20 000 random lines, and a language-agnostic conformance corpus), surface model, commands with upstream's exact error strings, transport, sessions and claim codes, renderer and alpha handling, emitter, chaos, version profiles, metrics access control, config validation, and 13 abuse tests driving each limit until it fires. |
+| **Playwright** — 18 tests        | The web UI, against a real server with a real satellite client attached. Nothing stubbed.                                                                                                                                                                                                                                                                                                                                       |
+
+`yarn test` runs vitest; `yarn test:e2e` builds and runs Playwright. Both are in CI, with Playwright
+artefacts uploaded on failure.
+
+**The e2e suite paid for itself on its first run**, catching a user-facing bug nothing else could:
+on an 8-key surface the Unclaimed screen rendered a **five-character claim code**, because the
+server-URL button was placed at `length - 2` after the code was laid out and overwrote its last
+character — making the session unclaimable. Every manual check had used a 32-key surface, where
+there was room to spare. The layout now allocates slots in priority order and drops the optional
+extras rather than the code; `unclaimed.test.ts` pins it across eight surface sizes.
+
+---
+
 ## What is not done
 
 Stated plainly rather than rounded up.

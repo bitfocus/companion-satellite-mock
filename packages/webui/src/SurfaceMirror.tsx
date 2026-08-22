@@ -24,7 +24,7 @@ export function SurfaceMirror({
 	}
 
 	return (
-		<section className="card">
+		<section className="card" data-testid="surface-panel">
 			<h2>
 				Surface{' '}
 				<span className="muted">

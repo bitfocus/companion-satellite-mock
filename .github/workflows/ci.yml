@@ -24,6 +24,27 @@ jobs:
       - run: node .yarn/releases/yarn-4.10.3.cjs test
       - run: node .yarn/releases/yarn-4.10.3.cjs workspace @satellite-mock/webui build
 
+  e2e:
+    # The UI has no other automated coverage, and the bugs it catches — a trace full of keepalives,
+    # a claim code overwritten on small surfaces — were all invisible to the unit tests.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: node .yarn/releases/yarn-4.10.3.cjs install --immutable
+      - run: node .yarn/releases/yarn-4.10.3.cjs build
+      - run: node .yarn/releases/yarn-4.10.3.cjs workspace @satellite-mock/webui build
+      - run: node .yarn/releases/yarn-4.10.3.cjs workspace @satellite-mock/e2e exec playwright install --with-deps chromium
+      - run: node .yarn/releases/yarn-4.10.3.cjs workspace @satellite-mock/e2e test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: packages/e2e/test-results/
+          retention-days: 7
+
   docker:
     # Build on every PR so a broken image is caught before merge; publishing happens in build.yml.
     runs-on: ubuntu-latest

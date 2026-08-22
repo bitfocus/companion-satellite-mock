@@ -35,7 +35,7 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 
 	return (
 		<aside className="sidebar">
-			<section className="card">
+			<section className="card" data-testid="scenario-panel">
 				<h2>Scenario</h2>
 				<ul className="scenarios">
 					{scenarios.map((scenario) => (
@@ -61,7 +61,7 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 				</ul>
 			</section>
 
-			<section className="card">
+			<section className="card" data-testid="device-panel">
 				<h2>Device</h2>
 				{session.device ? (
 					<dl className="facts">
@@ -103,7 +103,7 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 				)}
 			</section>
 
-			<section className="card">
+			<section className="card" data-testid="signals-panel">
 				<h2>Received-only signals</h2>
 				<p className="hint">
 					These produce nothing on the wire but an <code>OK</code>, so this panel is the only place to confirm
@@ -122,7 +122,7 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 				</dl>
 			</section>
 
-			<section className="card">
+			<section className="card" data-testid="raw-panel">
 				<h2>Send a raw line</h2>
 				<form
 					onSubmit={(event) => {
@@ -149,7 +149,7 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 
 			<VersionPanel apiVersions={apiVersions} />
 
-			<section className="card">
+			<section className="card" data-testid="connection-panel">
 				<h2>Connection</h2>
 				<div className="toolbar">
 					<button
@@ -171,7 +171,11 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 				<p className="hint">Unclaiming returns the surface to the Unclaimed scenario and mints a fresh code.</p>
 			</section>
 
-			{message && <p className="toast">{message}</p>}
+			{message && (
+				<p className="toast" data-testid="toast">
+					{message}
+				</p>
+			)}
 		</aside>
 	)
 }
