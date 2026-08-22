@@ -17,6 +17,14 @@ export interface SatelliteConnection {
 	readonly messagesSent: number
 	readonly openedAt: number
 
+	/**
+	 * Whether inbound PINGs should go unanswered.
+	 *
+	 * Lives on the connection because that is where the chaos wrapper is; the session consults it
+	 * rather than owning it, so the protocol layer stays unaware fault injection exists.
+	 */
+	readonly swallowPings?: boolean
+
 	/** Send one already-serialised line, terminator included. */
 	send(line: string): void
 	/** Close hard, the equivalent of Companion's `destroy()`. */

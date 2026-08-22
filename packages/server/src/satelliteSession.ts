@@ -11,6 +11,7 @@ import {
 	splitCommand,
 	SUPPORTED_API_VERSION,
 	unknownCommandError,
+	type BitmapFormat,
 	type ParsedParams,
 	type SatelliteCapabilities,
 } from '@satellite-mock/protocol'
@@ -41,6 +42,8 @@ export interface SatelliteSessionOptions {
 	capabilities?: SatelliteCapabilities
 	/** Lets the operator disable subscriptions on a version that supports them, as Companion does. */
 	subscriptionsEnabled?: boolean
+	/** Narrow what CAPS advertises, to exercise a client's bitmap-format fallback. */
+	bitmapFormats?: readonly BitmapFormat[] | undefined
 	handlers?: Map<string, CommandHandler>
 	/** Server-wide, because device ids are global in Companion — see DeviceRegistry. */
 	devices: DeviceRegistry
@@ -97,7 +100,10 @@ export class SatelliteSession {
 		)
 
 		this.#subscriptionsEnabled = options.subscriptionsEnabled ?? true
+		this.#bitmapFormats = options.bitmapFormats
 	}
+
+	readonly #bitmapFormats: readonly BitmapFormat[] | undefined
 
 	readonly #subscriptionsEnabled: boolean
 
@@ -131,6 +137,7 @@ export class SatelliteSession {
 		const handshake = {
 			companionVersion: this.#config.COMPANION_VERSION,
 			subscriptionsEnabled: this.#subscriptionsEnabled,
+			...(this.#bitmapFormats ? { bitmapFormats: this.#bitmapFormats } : {}),
 		}
 		this.send(buildBegin(this.capabilities, handshake))
 		const caps = buildCaps(this.capabilities, handshake)
@@ -193,7 +200,9 @@ export class SatelliteSession {
 		// Skip the parse for PING: its payload is the raw remainder, and it is by far the most
 		// frequent message on the wire.
 		if (upper === 'PING') {
-			this.send(buildPong(body))
+			// Deliberately unanswered when the chaos tool asks for it. A client should notice the
+			// silence and reconnect; one that does not will sit on a dead socket forever.
+			if (!this.connection.swallowPings) this.send(buildPong(body))
 			return
 		}
 		if (upper === 'PONG') return

@@ -28,7 +28,7 @@ const satellite = new SatelliteServer({
 runtime.start()
 await satellite.listen()
 
-const web = new WebServer({ config, logger, runtime })
+const web = new WebServer({ config, logger, runtime, satellite })
 await web.listen()
 
 await metrics.listen(() => metrics.sample(satellite, runtime))

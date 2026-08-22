@@ -269,14 +269,15 @@ belong.
 
 ---
 
-## Phase 8 — Fault injection (M)
+## Phase 8 — Fault injection (M) — ✅ done
 
 1. Chaos middleware on both directions: latency/jitter, drop, duplicate, reorder, frame
    split/coalesce, slow write, oversized line.
 2. Connection tools: graceful/abrupt disconnect, close codes, refuse-reconnect modes, ping
    misbehaviour, idle-timeout knob.
-3. Protocol profile switching: pending profile + _Apply & bounce_; sticky per-device overrides;
-   server-defined named profiles selectable via `?profile=`.
+3. Protocol profile selection by query parameter (`?api=`, `?subs=`, `?formats=`), validated against
+   known values. See the correction in [design.md §8.2](./design.md#82-protocol--version-knobs): the
+   planned pending-profile-and-bounce approach cannot work.
 4. Hard ceilings on every knob; all tools scoped to the claimed session only.
 
 **Done when:** a client can be shown to survive (or be shown _not_ to survive) one-byte-per-frame

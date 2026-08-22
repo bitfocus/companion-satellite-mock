@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { SessionSnapshot } from './App.js'
 import { trpc } from './trpc.js'
+import { ChaosPanel, VersionPanel } from './ChaosPanel.js'
 
 interface ScenarioInfo {
 	id: string
@@ -11,11 +12,16 @@ interface ScenarioInfo {
 
 export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; onUnclaimed: () => void }) {
 	const [scenarios, setScenarios] = useState<ScenarioInfo[]>([])
+	const [apiVersions, setApiVersions] = useState<readonly { version: string; companion: string | null }[]>([])
 	const [raw, setRaw] = useState('')
 	const [message, setMessage] = useState<string | null>(null)
 
 	useEffect(() => {
 		trpc.scenarios.query().then(setScenarios, () => setScenarios([]))
+		trpc.server.query().then(
+			(info) => setApiVersions(info.apiVersions),
+			() => setApiVersions([])
+		)
 	}, [])
 
 	const act = async (fn: () => Promise<unknown>, ok: string) => {
@@ -138,6 +144,10 @@ export function Sidebar({ session, onUnclaimed }: { session: SessionSnapshot; on
 				</form>
 				<p className="hint">Quotes and newlines are refused: they would corrupt the line.</p>
 			</section>
+
+			<ChaosPanel sessionId={session.id} connected={session.connected} />
+
+			<VersionPanel apiVersions={apiVersions} />
 
 			<section className="card">
 				<h2>Connection</h2>

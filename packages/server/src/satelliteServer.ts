@@ -1,4 +1,11 @@
-import { capabilitiesFor, SUPPORTED_API_VERSION } from '@satellite-mock/protocol'
+import {
+	capabilitiesFor,
+	KNOWN_API_VERSIONS,
+	SUPPORTED_API_VERSION,
+	type BitmapFormat,
+	type SatelliteCapabilities,
+} from '@satellite-mock/protocol'
+import { ChaosConnection, DEFAULT_CHAOS, type ChaosConfig } from './chaos.js'
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { Config } from './config.js'
@@ -33,6 +40,8 @@ export class SatelliteServer {
 	readonly #registry: ConnectionRegistry
 	readonly #devices = new DeviceRegistry()
 	readonly #sessions = new Set<SatelliteSession>()
+	/** Lets the API reach a connection's chaos wrapper without threading it through every layer. */
+	readonly #chaosByConnection = new WeakMap<SatelliteSession, ChaosConnection>()
 
 	#http: Server | undefined
 	#wss: WebSocketServer | undefined
@@ -58,6 +67,18 @@ export class SatelliteServer {
 
 	get devices(): DeviceRegistry {
 		return this.#devices
+	}
+
+	/** The chaos wrapper for a session, so the API can adjust it live. */
+	chaosFor(session: SatelliteSession): ChaosConnection | undefined {
+		return this.#chaosByConnection.get(session)
+	}
+
+	setChaos(session: SatelliteSession, config: ChaosConfig): boolean {
+		const chaos = this.#chaosByConnection.get(session)
+		if (!chaos) return false
+		chaos.setConfig(config)
+		return true
 	}
 
 	get address(): { port: number } | undefined {
@@ -122,32 +143,40 @@ export class SatelliteServer {
 	}
 
 	#onConnection(socket: WebSocket, request: IncomingMessage, ip: string): void {
-		const connection = new WebSocketConnection(socket, ip, request)
-		const logger = this.#logger.child({ connection: connection.id, ip: hashIp(ip) })
+		const raw = new WebSocketConnection(socket, ip, request)
+		// Every connection goes through the chaos wrapper, configured to do nothing until someone
+		// turns a knob on. Wrapping unconditionally keeps one code path rather than two.
+		const connection = new ChaosConnection(raw, DEFAULT_CHAOS)
+		const logger = this.#logger.child({ connection: raw.id, ip: hashIp(ip) })
+
+		const profile = this.#capabilitiesFor(request)
 		const session = new SatelliteSession({
 			connection,
 			config: this.#config,
 			logger,
 			devices: this.#devices,
 			events: this.#events,
-			subscriptionsEnabled: this.#subscriptionsEnabled,
+			capabilities: profile.capabilities,
+			subscriptionsEnabled: profile.subscriptionsEnabled,
+			bitmapFormats: profile.bitmapFormats,
 			// Built per connection because the command set depends on the advertised version: an
 			// older profile must answer `Unknown command` for a command it predates, exactly as a
 			// server of that vintage would.
-			handlers: buildCommandHandlers(this.#capabilitiesFor()),
+			handlers: buildCommandHandlers(profile.capabilities),
 		})
+		this.#chaosByConnection.set(session, connection)
 		this.#sessions.add(session)
 		logger.info({ total: this.#sessions.size }, 'connection opened')
 
 		// Teardown is anchored on 'close', which node guarantees fires exactly once, and is registered
 		// before anything that could throw — otherwise a failed handshake would leak the registry slot.
 		socket.on('close', () => {
-			connection.markClosed()
+			raw.markClosed()
 			const removed = session.cleanup()
 			this.#sessions.delete(session)
 			this.#registry.release(ip)
 			logger.info(
-				{ total: this.#sessions.size, devices: removed.length, bytesIn: connection.bytesReceived },
+				{ total: this.#sessions.size, devices: removed.length, bytesIn: raw.bytesReceived },
 				'connection closed'
 			)
 		})
@@ -155,7 +184,7 @@ export class SatelliteServer {
 
 		socket.on('message', (data) => {
 			const text = typeof data === 'string' ? data : data.toString()
-			connection.countReceived(Buffer.byteLength(text))
+			raw.countReceived(Buffer.byteLength(text))
 			session.receive(text)
 		})
 
@@ -167,9 +196,46 @@ export class SatelliteServer {
 		}
 	}
 
-	/** The capability set every new connection starts from. Phase 8 makes this per-device. */
-	#capabilitiesFor() {
-		return capabilitiesFor(SUPPORTED_API_VERSION)
+	/**
+	 * Resolve the advertised capabilities from the connection URL.
+	 *
+	 * This has to come from the URL, and that is a correction to the original design, which called
+	 * for a per-device override applied on the next connect. It cannot work: `BEGIN` and `CAPS` are
+	 * sent the moment the socket opens, long before any `ADD-DEVICE`, so the server has no device
+	 * identity at the point it must choose a version. The connection URL is the only thing it knows.
+	 *
+	 * Everything here is validated against a known list, so there is nothing to inject.
+	 */
+	#capabilitiesFor(request: IncomingMessage): {
+		capabilities: SatelliteCapabilities
+		subscriptionsEnabled: boolean
+		bitmapFormats: readonly BitmapFormat[] | undefined
+	} {
+		const url = new URL(request.url ?? '/', 'http://localhost')
+
+		const requested = url.searchParams.get('api')
+		const version = KNOWN_API_VERSIONS.some((entry) => entry.version === requested)
+			? requested!
+			: SUPPORTED_API_VERSION
+		const capabilities = capabilitiesFor(version)
+
+		const subscriptionsEnabled = url.searchParams.get('subs') !== '0' && this.#subscriptionsEnabled
+
+		const formatsParam = url.searchParams.get('formats')
+		const bitmapFormats = formatsParam
+			? (formatsParam
+					.split(',')
+					.filter((format): format is BitmapFormat =>
+						(capabilities.bitmapFormats as readonly string[]).includes(format)
+					) as readonly BitmapFormat[])
+			: undefined
+
+		return {
+			capabilities,
+			subscriptionsEnabled,
+			// An empty or entirely-unknown list would advertise nothing; fall back rather than lie.
+			bitmapFormats: bitmapFormats && bitmapFormats.length > 0 ? bitmapFormats : undefined,
+		}
 	}
 
 	#checkLiveness(): void {

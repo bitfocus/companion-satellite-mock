@@ -321,10 +321,16 @@ shows which features the connected client actually negotiated, and greys out wha
 
 ### 8.2 Protocol & version knobs
 
-Because `BEGIN`/`CAPS` are sent at connect time, changing the advertised version can't apply to a
-live connection. The UI therefore edits a **pending profile** and offers _Apply & bounce_ — which
-sets the profile and then drops the connection so the client reconnects into it. (That doubles as a
-reconnect test.)
+`BEGIN` and `CAPS` are sent the moment the socket opens, so the version cannot change on a live
+connection. The original design proposed a **pending profile** plus _Apply & bounce_, and a sticky
+per-device override applied on the next connect. **Implementing it showed that cannot work**: the
+handshake precedes any `ADD-DEVICE`, so at the point the server must choose a version it has no
+device identity to key an override on. The connection URL is the only thing it knows.
+
+So the version is selected by query parameter — `?api=1.9.0`, `?subs=0`, `?formats=rgb` — validated
+against known values, and the UI is a builder that hands you the URL to point your client at.
+_Apply & bounce_ survives as a plain force-disconnect, which is still useful for reconnect testing,
+but it is no longer how the version changes.
 
 Controls:
 

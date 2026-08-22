@@ -5,9 +5,13 @@ import { BUILTIN_SCENARIOS } from '../scenarios/builtin.js'
 import type { MockRuntime } from '../runtime.js'
 import { isSafeValue } from '@satellite-mock/protocol'
 import { TokenBucket } from '../limits.js'
+import { ChaosConfigSchema, DEFAULT_CHAOS } from '../chaos.js'
+import type { SatelliteServer } from '../satelliteServer.js'
 
 export interface TrpcContext {
 	runtime: MockRuntime
+	/** Needed to reach a connection's chaos wrapper, which lives with the transport. */
+	satellite: SatelliteServer
 	/** Opaque per-browser id, from localStorage. Not a credential — it scopes, it does not authorise. */
 	uiClientId: string
 }
@@ -267,6 +271,24 @@ export const appRouter = t.router({
 
 		session.connection.send(`${input.line}\n`)
 		session.record('out', input.line)
+		return { ok: true }
+	}),
+
+	chaos: publicProcedure.input(sessionIdInput).query(({ ctx, input }) => {
+		const session = requireClaimed(ctx, input.sessionId)
+		if (!session.connection) return DEFAULT_CHAOS
+		return ctx.satellite.chaosFor(session.connection)?.config ?? DEFAULT_CHAOS
+	}),
+
+	setChaos: mutation.input(sessionIdInput.extend({ config: ChaosConfigSchema })).mutation(({ ctx, input }) => {
+		const session = requireClaimed(ctx, input.sessionId)
+		if (!session.connection) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Client not connected' })
+
+		// Scoped to this session's connection only. A tool that could be pointed at someone
+		// else's connection would be an amplifier rather than a test tool.
+		if (!ctx.satellite.setChaos(session.connection, input.config)) {
+			throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No live connection' })
+		}
 		return { ok: true }
 	}),
 

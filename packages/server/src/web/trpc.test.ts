@@ -33,7 +33,8 @@ async function startStack(overrides: Partial<Config> = {}) {
 	await server.listen()
 	started.push({ server, runtime })
 
-	const caller = (uiClientId: string) => appRouter.createCaller({ runtime, uiClientId } satisfies TrpcContext)
+	const caller = (uiClientId: string) =>
+		appRouter.createCaller({ runtime, satellite: server, uiClientId } satisfies TrpcContext)
 	return { server, runtime, caller, url: `ws://127.0.0.1:${server.address!.port}/ws/satellite` }
 }
 

@@ -7,12 +7,14 @@ import { applyWSSHandler } from '@trpc/server/adapters/ws'
 import type { Config } from '../config.js'
 import type { Logger } from '../logging.js'
 import type { MockRuntime } from '../runtime.js'
+import type { SatelliteServer } from '../satelliteServer.js'
 import { appRouter, type TrpcContext } from './trpc.js'
 
 export interface WebServerOptions {
 	config: Config
 	logger: Logger
 	runtime: MockRuntime
+	satellite: SatelliteServer
 	/** Where the built UI lives. Omitted in tests, which only exercise the API. */
 	staticDir?: string
 }
@@ -29,6 +31,7 @@ export class WebServer {
 	readonly #config: Config
 	readonly #logger: Logger
 	readonly #runtime: MockRuntime
+	readonly #satellite: SatelliteServer
 	readonly #staticDir: string | undefined
 
 	#http: Server | undefined
@@ -39,6 +42,7 @@ export class WebServer {
 		this.#config = options.config
 		this.#logger = options.logger.child({ component: 'web' })
 		this.#runtime = options.runtime
+		this.#satellite = options.satellite
 		this.#staticDir = options.staticDir ?? defaultStaticDir()
 	}
 
@@ -103,7 +107,7 @@ export class WebServer {
 			createContext: ({ req }): TrpcContext => {
 				const url = new URL(req.url ?? '/', 'http://localhost')
 				const uiClientId = url.searchParams.get('client') ?? 'anonymous'
-				return { runtime: this.#runtime, uiClientId: uiClientId.slice(0, 64) }
+				return { runtime: this.#runtime, satellite: this.#satellite, uiClientId: uiClientId.slice(0, 64) }
 			},
 		})
 
