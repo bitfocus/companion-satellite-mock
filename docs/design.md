@@ -280,7 +280,7 @@ shows which features the connected client actually negotiated, and greys out wha
 
 | #   | Scenario                 | What it demonstrates / tests                                                                                                                                                                                              |
 | --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Unclaimed** (auto)     | Claim code + liveness. Press/rotate feedback. The zero-interaction surface.                                                                                                                                                 |
+| 1   | **Unclaimed** (auto)     | Claim code + liveness. Press/rotate feedback. The zero-interaction surface.                                                                                                                                               |
 | 2   | **Companion Home**       | A believable Companion page: `PAGEUP`/`PAGEDOWN`/`PAGENUM` buttons, realistic labels (`CAM 1`, `ATEM PGM`), `LOCATION` set, press latching, page navigation via `CHANGE-PAGE`. The screenshot/demo-video scenario.        |
 | 3   | **Input echo**           | The surface displays what the server received: last key index _and_ how it was interpreted (flat index vs `row/col`), press/release timing, rotation deltas. The single best tool for verifying a client's input mapping. |
 | 4   | **Colour & text matrix** | Every button a different colour; text with unicode, emoji, RTL, very long strings, embedded newlines; `FONT_SIZE` numeric and `auto`; both `hex` and `rgb` colour formats.                                                |
@@ -291,7 +291,7 @@ shows which features the connected client actually negotiated, and greys out wha
 | 9   | **Variables**            | Streams `VARIABLE-VALUE` for the output variables the client declared (clock, counter, random, long string); shows inbound `SET-VARIABLE-VALUE` in the UI.                                                                |
 | 10  | **Device config**        | Renders the client's `CONFIG_FIELDS` as a real form in the web UI (same field schema Companion uses) and pushes `DEVICE-CONFIG` on change.                                                                                |
 | 11  | **Subscriptions**        | For clients using `ADD-SUB`: a virtual page grid in the UI whose cells can be edited, streaming `SUB-STATE` to matching subscriptions.                                                                                    |
-| 12  | **Attract / animation**  | A slow, pretty animation (plasma, marquee, clock) at a capped frame rate — for the demo video and for an unattended demo instance.                                                                              |
+| 12  | **Attract / animation**  | A slow, pretty animation (plasma, marquee, clock) at a capped frame rate — for the demo video and for an unattended demo instance.                                                                                        |
 | 13  | **Stress**               | The bounded load tool (§8.3), presented as a scenario.                                                                                                                                                                    |
 
 ## 8. Web UI
