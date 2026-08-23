@@ -2,8 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # `main` plus agent branches. Work on a `claude/**` branch usually has no PR open yet, and with
+    # only the two triggers below it got no CI at all — including the docker job, which is the one
+    # thing here that has never run anywhere else.
+    branches: [main, 'claude/**']
   pull_request:
+  # So a run can be kicked off by hand from the Actions tab without pushing anything.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
