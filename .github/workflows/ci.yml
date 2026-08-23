@@ -1,11 +1,11 @@
 name: CI
 
 on:
+  # Every branch. No filter: a check that only runs on some branches is a check you cannot rely on,
+  # and there is nothing here worth withholding from a work-in-progress branch.
   push:
-    # `main` plus agent branches. Work on a `claude/**` branch usually has no PR open yet, and with
-    # only the two triggers below it got no CI at all — including the docker job, which is the one
-    # thing here that has never run anywhere else.
-    branches: [main, 'claude/**']
+  # Only adds anything for forks, which have no push event in this repo. Same-repo PRs are already
+  # covered by their push, so the jobs skip that duplicate — see the `if` on each one.
   pull_request:
   # So a run can be kicked off by hand from the Actions tab without pushing anything.
   workflow_dispatch:
@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   check:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -32,6 +33,7 @@ jobs:
   e2e:
     # The UI has no other automated coverage, and the bugs it catches — a trace full of keepalives,
     # a claim code overwritten on small surfaces — were all invisible to the unit tests.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -52,6 +54,7 @@ jobs:
 
   docker:
     # Build on every PR so a broken image is caught before merge; publishing happens in build.yml.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
