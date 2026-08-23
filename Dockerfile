@@ -11,10 +11,18 @@ WORKDIR /app
 
 COPY package.json yarn.lock .yarnrc.yml tsconfig.base.json tsconfig.json ./
 COPY .yarn ./.yarn
+# Every workspace manifest, because `workspaces: packages/*` means yarn resolves a different
+# project when one is missing and `--immutable` then refuses the resulting lockfile change. The e2e
+# package is not built or shipped, but its manifest still has to be here for the install to match.
+# `dockerfile.test.ts` asserts this list stays complete.
+COPY packages/e2e/package.json        packages/e2e/
 COPY packages/protocol/package.json   packages/protocol/
 COPY packages/server/package.json     packages/server/
 COPY packages/testclient/package.json packages/testclient/
 COPY packages/webui/package.json      packages/webui/
+# The e2e manifest brings @playwright/test, whose install script otherwise downloads a browser that
+# nothing in this image will ever run.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN node $YARN install --immutable
 
 COPY . .
@@ -27,10 +35,12 @@ WORKDIR /app
 
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn ./.yarn
+COPY packages/e2e/package.json        packages/e2e/
 COPY packages/protocol/package.json   packages/protocol/
 COPY packages/server/package.json     packages/server/
 COPY packages/testclient/package.json packages/testclient/
 COPY packages/webui/package.json      packages/webui/
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN node $YARN workspaces focus --production @satellite-mock/server --all
 
 # ---------------------------------------------------------------------------------------------
