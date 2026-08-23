@@ -364,11 +364,6 @@ extras rather than the code; `unclaimed.test.ts` pins it across eight surface si
 Stated plainly rather than rounded up.
 
 - **The soak test.** It needs an hour of wall clock to mean anything.
-- **The Docker build has never run.** There is no daemon in the environment this was built in, so
-  CI will be its first execution. The Dockerfile is written and the CI job builds and smoke tests
-  the image, but treat the first CI run as the real verification.
-- **`@napi-rs/canvas` is verified on x64 glibc only.** The image is Alpine (musl); the musl prebuild
-  exists and is declared, but has not been executed here.
 
 ---
 
@@ -377,6 +372,24 @@ Stated plainly rather than rounded up.
 TCP listener (the abstraction is in place — expect ~100 lines plus its own rate limits and the loss
 of `Origin`-based defences); the malformed/hostile-input tool suite (the raw sender covers it by
 hand); persistence; session record/replay; multi-viewer sessions; i18n.
+
+---
+
+## Verified in CI
+
+The first CI run this repo ever had was on 2026-08-23, and it found one thing the local checks
+structurally could not: the image build failed on `yarn install --immutable`, because the
+Dockerfile enumerates workspace manifests by hand and `packages/e2e` had been added without
+updating that list. A full checkout installs fine, so every local check passed while only the image
+was broken. `packages/server/src/dockerfile.test.ts` now asserts that list stays complete.
+
+Two things previously listed as unverified now have evidence:
+
+- **The Docker build runs.** `linux/amd64`, green, image `sha256:0708a7ad…`.
+- **`@napi-rs/canvas` works on musl.** The smoke test runs inside the Alpine image and printed
+  `canvas ok, png 1037 bytes`. It asserts a lit pixel rather than just a buffer length, so it is
+  also a real check that `fontconfig` + `font-dejavu` is enough — an image with no fonts renders
+  every label blank and would fail here.
 
 ---
 
