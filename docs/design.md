@@ -208,27 +208,36 @@ knowing.
 - **Encoders:** raw RGB (`w*h*3`, base64) for `rgb`; `canvas.encode('png'|'webp')` wrapped in a
   `data:` URL for the others. Format follows the per-device/per-subscription negotiation.
 
-### Measured (Phase 0 spike, Node 26.7.0 / `@napi-rs/canvas` / x64)
+### Measured
 
-The spike ran before any design was committed to; the numbers moved two decisions.
+Re-run it yourself: `node scripts/bench-render.mjs`. It lives in the repo because the version of
+this section written from a one-off spike drew a conclusion that contradicted its own table, and
+survived that way — a measurement that cannot be re-run is one that will eventually be wrong.
 
-| Operation (72×72 button)                          | ms/op                     |
-| ------------------------------------------------- | ------------------------- |
-| draw only                                         | 0.068                     |
-| `getImageData()` + naive RGBA→RGB loop            | ~1.14                     |
-| **`canvas.data()` + tight indexed loop**          | **0.144**                 |
-| `toBuffer('image/png')`                           | 0.42                      |
-| `toBuffer('image/webp')`                          | 0.66                      |
-| Full unique 32-key surface, draw + rgb, fast path | **12.0** (was 43.6 naive) |
+Numbers below are from a 4-core container and include the draw; the machine is shared, so treat the
+_ordering_ as the finding and the absolute figures as indicative.
 
-Payloads for that button: `rgb` 15552 B, `png` 1155 B, `webp` 1168 B.
+| Operation (72×72 button, draw included)  | ms/op     |
+| ---------------------------------------- | --------- |
+| draw only                                | 0.030     |
+| **`canvas.data()` + tight indexed loop** | **0.060** |
+| `getImageData()` + naive RGBA→RGB loop   | 0.379     |
+| `toBuffer('image/png')`                  | 0.440     |
+| `toBuffer('image/webp')`                 | 0.653     |
+
+Subtracting the draw: the RGBA→RGB conversion costs ~0.030 ms and the PNG encode ~0.410 ms, so the
+encode is **~14× the conversion it would replace**.
+
+Payloads for that button: `rgb` 15552 B, `png` 1129 B, `webp` 1198 B.
 
 Three conclusions:
 
-1. **Use `canvas.data()`, not `getImageData()`** — 13× cheaper, and the RGBA→RGB loop must be written
-   with explicit indexing (`out[o]=…; o+=3`) rather than `o++` per channel, which is a further 3.4×.
-   Together they take a cold full-surface redraw from 44 ms to 12 ms, comfortably inside a 30 fps
-   frame even with every button unique.
+1. **Use `canvas.data()`, not `getImageData()`, and index the output explicitly.** The benchmark
+   compares the shipping path against the naive one — `getImageData()` plus `o++` per channel — and
+   measures roughly an order of magnitude between them (0.030 ms vs 0.349 ms of conversion, draw
+   subtracted). The two effects are not separated by the script; if you want them apart, add a
+   variant. Either way the fast path leaves a full unique 32-key redraw comfortably inside a 30 fps
+   frame.
 2. **`canvas.data()` returns _premultiplied_ RGBA; `getImageData()` returns _straight_.** This is
    the one to get right — it has bitten Companion. Measured on a 50%-alpha white pixel over nothing:
 
@@ -251,15 +260,40 @@ Three conclusions:
    - Unit-test both paths against a **semi-transparent fixture**, not just an opaque one. An opaque
      fixture passes under either mistake, which is exactly how this class of bug survives review.
 
-3. **PNG is cheaper than raw RGB _and_ 13× smaller on the wire** — the encode costs less than the
-   RGBA→RGB conversion it replaces. So `png` is the preferred format to negotiate whenever a client
-   can decode it, and `rgb` is the compatibility path rather than the fast path. Worth telling client
-   authors.
+3. **PNG is 14× smaller on the wire and several times more expensive to produce.** It is a genuine
+   trade — CPU for bandwidth — not a free win.
 
-Also measured: `canvas.encode()` (the promise-returning form) does **not** meaningfully free the
-event loop — 200 parallel encodes ticked a 1 ms interval only twice. Treat encoding as blocking CPU
-work: the render semaphore is doing real work, and if encoding ever becomes the bottleneck the answer
-is `worker_threads`, not `await`.
+   An earlier version of this section claimed the opposite: that the PNG encode cost _less_ than the
+   RGBA→RGB conversion it replaces, and that `png` was therefore the format to prefer. That was
+   wrong, and wrong against the table printed directly above it. The likely cause is that PNG was
+   compared against the _naive_ `getImageData()` conversion and never re-compared after conclusion 1
+   made the rgb path an order of magnitude faster. Do not repeat the advice to client authors.
+
+   The honest guidance: **`rgb` is the cheap path for the server, `png` is the cheap path for the
+   network.** On a LAN, or anywhere the server is CPU-bound, prefer `rgb`. Over the internet, or with
+   many large surfaces, the 14× bandwidth saving is worth the CPU. Neither is "the fast path"
+   unqualified.
+
+   `@julusian/image-rs` was evaluated as a native replacement for the conversion loop and is _not_
+   used: measured against the shipping loop it was within noise (~1.05×), because at ~0.030 ms the
+   conversion was never the bottleneck — the encode is. Its output was byte-identical to the
+   shipping loop from both the premultiplied and straight sources, which is a useful independent
+   confirmation of the alpha rule in conclusion 2. It would become interesting if the renderer ever
+   needed off-thread conversion or resizing, neither of which it does today.
+
+**Encoding and the event loop.** An earlier note here claimed `canvas.encode()` (the promise form)
+does not meaningfully free the event loop, from a single sample of "ticked a 1 ms interval only
+twice". Repeated, that sample turns out to be the bottom of the range rather than the result: across
+runs of 200 parallel encodes the loop ticks 2–13 times, against a flat 0 for the synchronous
+`toBuffer`, and the batch completes in roughly a third of the time (≈19 ms vs ≈58 ms) because it
+uses a thread pool.
+
+So `encode()` does parallelise and does leave the loop partly free. The renderer nonetheless still
+calls `toBuffer` synchronously, because `render()` is synchronous and on the cache-hit path — which
+is the overwhelming majority of calls — no encoding happens at all. Moving to `encode()` is a real
+optimisation available if encoding ever shows up in a profile; it is not free, since it makes the
+renderer async all the way up. The render budget stays either way: it bounds total pixels per
+second, which a thread pool does not.
 
 - **Cache.** Keyed by `hash(style) + size + format + rotation`. Demo content is highly repetitive
   (same colours, same labels, animation frames that recur), so the cache turns the animation and
