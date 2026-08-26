@@ -66,6 +66,34 @@ Benefits: nothing to copy out of the app; enumeration is defeated by a ~10^9 cod
 limiting; it works identically over TCP; and the zero-interaction path is exactly the desired one — connect,
 see a working, interactive, self-explanatory surface.
 
+### 4.4 A device id that is already in use
+
+Two connections registering the same device id is the one place this server deliberately diverges
+from Companion on the wire, so it is worth being explicit about why.
+
+Companion tells the socket that **already holds** the id (`ADD-DEVICE ERROR … "Device exists
+elsewhere"`) and sends the requesting socket **nothing at all**, leaving it to time out. The holder
+keeps its device; the newcomer is not registered.
+
+Reproducing that exactly leaves the newcomer somewhere it cannot get out of, and — unlike against
+real Companion — cannot even diagnose. Pairing here requires a claim code that is drawn _on the
+surface_, so a client refused a surface can never reach the web UI to be told why. Silence is a dead
+end with no channel out of it.
+
+So the default (`friendly`) accepts the registration, does **not** register the device, and draws
+the reason onto the surface: `CAN'T PAIR`, `ID IN USE`, and the offending id. The holder still gets
+its error and keeps its device, and the new surface can be drawn on but never driven — input naming
+that id is refused by the ownership check like any unregistered device.
+
+The screen also names the real behaviour and how to get it, so the friendlier default _teaches_
+Companion's rule instead of concealing it. `?duplicates=strict` reproduces upstream exactly, which
+matters because the silence is a genuine production case: a client reconnecting before its previous
+socket has been reaped hits precisely this, and must survive it.
+
+One consequence of building the surface before answering: under `friendly` a request that is both a
+duplicate _and_ has a malformed `LAYOUT_MANIFEST` reports the malformed layout, because a surface
+that cannot be built is a surface nothing can be explained on. `strict` keeps upstream's ordering.
+
 ### 4.3 Session identity and continuity
 
 - A **session** corresponds to one _connection_, keyed for continuity by its **primary device id**
@@ -327,7 +355,8 @@ per-device override applied on the next connect. **Implementing it showed that c
 handshake precedes any `ADD-DEVICE`, so at the point the server must choose a version it has no
 device identity to key an override on. The connection URL is the only thing it knows.
 
-So the version is selected by query parameter — `?api=1.9.0`, `?subs=0`, `?formats=rgb` — validated
+So the version is selected by query parameter — `?api=1.9.0`, `?subs=0`, `?formats=rgb`, and
+`?duplicates=strict` (§4.4) — validated
 against known values, and the UI is a builder that hands you the URL to point your client at.
 _Apply & bounce_ survives as a plain force-disconnect, which is still useful for reconnect testing,
 but it is no longer how the version changes.

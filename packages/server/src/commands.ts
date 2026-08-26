@@ -107,16 +107,27 @@ const addDevice: CommandHandler = (context) => {
 	}
 
 	const existing = session.devices.get(id)
+	/** Set when another connection already holds this id and we are going to say so on the surface. */
+	let idInUse = false
 	if (existing) {
 		if (existing.connection === session.connection) return fail(session, messageName, id, ERRORS.deviceAlreadyAdded)
-		// Quirk: the error goes to the socket that already holds the device, and the requesting
-		// socket gets no reply at all.
+
+		// Quirk, and the same under either policy: the error goes to the socket that already holds
+		// the device. That client is entitled to know someone tried to take its id, and it keeps it.
 		// Sent straight to the other connection rather than through its session: we hold the device,
 		// not its session. It therefore does not appear in that session's trace, which is a known gap.
 		existing.connection.send(
 			buildErrorResponse(messageName, id, ERRORS.deviceExistsElsewhere, session.capabilities)
 		)
-		return
+
+		// Companion sends the requesting socket nothing at all, leaving it to time out.
+		if (session.duplicatePolicy === 'strict') return
+
+		// Friendly: carry on and build the surface, so there is something to draw the reason onto.
+		// Note this also moves the duplicate check *after* layout validation for this policy — a
+		// request that is both duplicate and malformed reports the malformed layout, because a
+		// surface we cannot build is a surface we cannot explain anything on.
+		idInUse = true
 	}
 
 	if (session.devices.forConnection(session.connection).length >= MAX_DEVICES_PER_CONNECTION) {
@@ -190,6 +201,15 @@ const addDevice: CommandHandler = (context) => {
 		configFields,
 		addedAt: Date.now(),
 		firmwareUpdateUrl: null,
+	}
+
+	if (idInUse) {
+		// Deliberately not registered: the id belongs to the other connection and it keeps it, so
+		// this surface can be drawn on but never driven. Input referencing the id is refused by
+		// `getOwned` exactly as it would be for any unregistered device.
+		session.events.onDeviceRejected?.(session, device, 'id-in-use')
+		ok(session, messageName, id)
+		return
 	}
 
 	session.devices.add(device)

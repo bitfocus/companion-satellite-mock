@@ -8,6 +8,7 @@ import { RenderBudget } from './render/budget.js'
 import { ButtonRenderer } from './render/renderer.js'
 import { ScenarioEngine } from './scenarios/engine.js'
 import { findScenario, unclaimedScenario } from './scenarios/builtin.js'
+import { drawUnpairable } from './scenarios/unpairable.js'
 import type { Scenario } from './scenarios/types.js'
 import type { SatelliteSession } from './satelliteSession.js'
 import { SessionManager, type MockSession } from './sessions.js'
@@ -152,6 +153,7 @@ export class MockRuntime {
 			onConnectionOpen: (session) => this.#connections.add(session),
 			onConnectionClose: (session) => this.#connections.delete(session),
 			onDeviceAdded: (connection, device) => this.#onDeviceAdded(connection, device),
+			onDeviceRejected: (connection, device) => this.#onDeviceRejected(connection, device),
 			onDeviceRemoved: (_connection, device) => this.#onDeviceRemoved(device),
 			onKeyPress: (_c, device, controlId, pressed) => this.scenarios.press(device.id, controlId, pressed),
 			onKeyRotate: (_c, device, controlId, delta) => this.scenarios.rotate(device.id, controlId, delta),
@@ -202,6 +204,33 @@ export class MockRuntime {
 		if (device.configFields) emitter.sendDeviceConfig(configValues)
 
 		this.#logger.info({ device: device.id, claimCode: session.claimCode }, 'device attached')
+	}
+
+	/**
+	 * Draw the "cannot pair" screen for a registration we accepted but did not register.
+	 *
+	 * Kept entirely outside `#devices`, which is keyed by device id — the id belongs to the other
+	 * connection and putting this here would evict the real one, which is the exact takeover the
+	 * whole check exists to prevent. It gets an emitter and a single static screen: nothing drives
+	 * it, and input naming that id is refused upstream of here by the ownership check.
+	 */
+	#onDeviceRejected(connection: SatelliteSession, device: Device): void {
+		const emitter = new SurfaceEmitter({
+			device,
+			connection: connection.connection,
+			capabilities: connection.capabilities,
+			renderer: this.renderer,
+			budget: new RenderBudget(this.#config.MAX_BYTES_PER_SECOND * 4),
+			onOverflow: () => connection.close(),
+		})
+
+		drawUnpairable(emitter, device.surface, device.id)
+
+		this.#logger.warn(
+			{ device: device.id, connection: connection.connection.id },
+			'device id already registered by another connection — drew the unpairable screen. ' +
+				'Companion would send nothing here; connect with ?duplicates=strict to reproduce that.'
+		)
 	}
 
 	#onDeviceRemoved(device: Device): void {

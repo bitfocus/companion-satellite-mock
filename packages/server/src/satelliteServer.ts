@@ -15,7 +15,7 @@ import { hashIp, type Logger } from './logging.js'
 import { buildCommandHandlers } from './commands.js'
 import { DeviceRegistry } from './devices.js'
 import type { SatelliteEvents } from './events.js'
-import { SatelliteSession } from './satelliteSession.js'
+import { SatelliteSession, type DuplicatePolicy } from './satelliteSession.js'
 import { WebSocketConnection } from './transport/wsTransport.js'
 
 export interface SatelliteServerOptions {
@@ -195,6 +195,7 @@ export class SatelliteServer {
 			capabilities: profile.capabilities,
 			subscriptionsEnabled: profile.subscriptionsEnabled,
 			bitmapFormats: profile.bitmapFormats,
+			duplicatePolicy: profile.duplicatePolicy,
 			// Built per connection because the command set depends on the advertised version: an
 			// older profile must answer `Unknown command` for a command it predates, exactly as a
 			// server of that vintage would.
@@ -248,6 +249,7 @@ export class SatelliteServer {
 		capabilities: SatelliteCapabilities
 		subscriptionsEnabled: boolean
 		bitmapFormats: readonly BitmapFormat[] | undefined
+		duplicatePolicy: DuplicatePolicy
 	} {
 		const url = new URL(request.url ?? '/', 'http://localhost')
 
@@ -268,9 +270,13 @@ export class SatelliteServer {
 					) as readonly BitmapFormat[])
 			: undefined
 
+		// Defaults to the friendlier behaviour; `?duplicates=strict` reproduces Companion exactly.
+		const duplicatePolicy: DuplicatePolicy = url.searchParams.get('duplicates') === 'strict' ? 'strict' : 'friendly'
+
 		return {
 			capabilities,
 			subscriptionsEnabled,
+			duplicatePolicy,
 			// An empty or entirely-unknown list would advertise nothing; fall back rather than lie.
 			bitmapFormats: bitmapFormats && bitmapFormats.length > 0 ? bitmapFormats : undefined,
 		}

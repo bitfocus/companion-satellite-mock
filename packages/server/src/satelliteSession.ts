@@ -35,6 +35,17 @@ export interface CommandContext {
 	params: ParsedParams
 }
 
+/**
+ * How a duplicate device id is handled.
+ *
+ * `strict` is Companion's own behaviour: the socket that already holds the id is told, and the one
+ * that asked gets no reply whatsoever. `friendly` is this server being more helpful than the real
+ * thing — it accepts the registration and draws the reason onto the surface, because otherwise the
+ * newcomer is in a dead end it cannot see or escape: it never gets a claim code, so it cannot even
+ * reach the web UI to find out why. See docs/design.md §4.4.
+ */
+export type DuplicatePolicy = 'friendly' | 'strict'
+
 export interface SatelliteSessionOptions {
 	connection: SatelliteConnection
 	config: Config
@@ -44,6 +55,8 @@ export interface SatelliteSessionOptions {
 	subscriptionsEnabled?: boolean
 	/** Narrow what CAPS advertises, to exercise a client's bitmap-format fallback. */
 	bitmapFormats?: readonly BitmapFormat[] | undefined
+	/** What to do when a second connection claims an already-registered device id. */
+	duplicatePolicy?: DuplicatePolicy
 	handlers?: Map<string, CommandHandler>
 	/** Server-wide, because device ids are global in Companion — see DeviceRegistry. */
 	devices: DeviceRegistry
@@ -62,6 +75,7 @@ export class SatelliteSession {
 	readonly capabilities: SatelliteCapabilities
 	readonly devices: DeviceRegistry
 	readonly events: SatelliteEvents
+	readonly duplicatePolicy: DuplicatePolicy
 	/** Subscriptions are per-connection, not per-device — they exist without any surface at all. */
 	readonly subscriptions = new Map<string, Subscription>()
 
@@ -100,6 +114,7 @@ export class SatelliteSession {
 		)
 
 		this.#subscriptionsEnabled = options.subscriptionsEnabled ?? true
+		this.duplicatePolicy = options.duplicatePolicy ?? 'friendly'
 		this.#bitmapFormats = options.bitmapFormats
 	}
 

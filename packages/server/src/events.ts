@@ -42,6 +42,12 @@ export interface SatelliteEvents {
 	 */
 	onConnectionOpen?: (session: SatelliteSession) => void
 	onConnectionClose?: (session: SatelliteSession) => void
+	/**
+	 * A registration this server accepted but did not register, because another connection holds the
+	 * id. Only fires under the `friendly` duplicate policy; `strict` reproduces Companion's silence.
+	 */
+	onDeviceRejected?(connection: SatelliteSession, device: Device, reason: 'id-in-use'): void
+
 	onDeviceAdded?: (session: SatelliteSession, device: Device) => void
 	onDeviceRemoved?: (session: SatelliteSession, device: Device) => void
 	onKeyPress?: (session: SatelliteSession, device: Device, controlId: string, pressed: boolean) => void

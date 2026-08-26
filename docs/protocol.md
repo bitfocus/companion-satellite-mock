@@ -40,7 +40,10 @@ Each of these is a test case in `packages/protocol`.
 7. **Booleans are always emitted as `1`/`0`**, and accepted as `true`/`false`/`1`/`0`.
 8. **`PING`'s payload is the raw unparsed remainder of the line**, echoed as-is into `PONG`.
 9. **`Device exists elsewhere` is sent to the _existing_ socket**, not to the one that asked. The
-   requesting socket gets no reply at all.
+   requesting socket gets no reply at all, and the holder keeps its device — the newcomer does not
+   take it over. Verified against upstream `SatelliteApi.ts`, which returns immediately after
+   messaging the holder. This server defaults to a friendlier behaviour here; see docs/design.md
+   §4.4, and use `?duplicates=strict` for upstream's exact silence.
 10. **`Line too long` is emitted as `ERROR ERROR MESSAGE="Line too long"`** — `messageName` is
     `'ERROR'` _and_ the status is `'ERROR'`.
 11. **`BITMAPS=1`, any non-numeric truthy value, or a number `<5` all mean 72 px.**

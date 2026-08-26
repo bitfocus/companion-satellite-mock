@@ -238,3 +238,78 @@ describe('scenarios over the wire', () => {
 		expect(bitmap.startsWith('data:image/png;base64,')).toBe(true)
 	})
 })
+
+describe('a second client using an already-registered device id', () => {
+	const SURFACE = { KEYS_TOTAL: 8, KEYS_PER_ROW: 4, COLORS: 'hex', TEXT: 1 } as const
+
+	it('is told why on the surface itself, rather than left waiting', async () => {
+		const { url } = await startStack()
+
+		const first = await connectClient(url)
+		await first.addDevice('shared:id', SURFACE)
+		await first.waitForCount('KEY-STATE', 8)
+
+		const second = await connectClient(url)
+		await second.addDevice('shared:id', SURFACE)
+
+		// The surface it is drawn is the only channel that reaches this client: it has no claim code,
+		// so it can never reach the web UI to be told anything.
+		const states = await second.waitForCount('KEY-STATE', 3, 5000)
+		const texts = states.map((message) => decode(message.params.TEXT))
+
+		expect(texts.join(' ')).toContain("CAN'T")
+		expect(texts.join(' ')).toContain('ID IN')
+		// Names the id, so a developer running two builds knows which one collided.
+		expect(texts).toContain('shared:id')
+	})
+
+	it('says on-screen what Companion really does, so the divergence teaches rather than hides', async () => {
+		const { url } = await startStack()
+
+		const first = await connectClient(url)
+		await first.addDevice('shared:id', SURFACE)
+		await first.waitForCount('KEY-STATE', 8)
+
+		const second = await connectClient(url)
+		await second.addDevice('shared:id', SURFACE)
+		const states = await second.waitForCount('KEY-STATE', 5, 5000)
+		const all = states.map((message) => decode(message.params.TEXT)).join(' ')
+
+		expect(all).toContain('COMPANION')
+		expect(all).toContain('?duplicates')
+	})
+
+	it('does not disturb what the first client is showing', async () => {
+		const { url } = await startStack()
+
+		const first = await connectClient(url)
+		await first.addDevice('shared:id', SURFACE)
+		await first.waitForCount('KEY-STATE', 8)
+		const before = first.messagesOf('KEY-STATE').length
+
+		const second = await connectClient(url)
+		await second.addDevice('shared:id', SURFACE)
+		await second.waitForCount('KEY-STATE', 3, 5000)
+
+		// The holder receives its ADD-DEVICE error and nothing else — its surface is untouched.
+		expect(first.messagesOf('KEY-STATE').length).toBe(before)
+		expect(first.messagesOf('ADD-DEVICE').at(-1)?.params.MESSAGE).toBe('Device exists elsewhere')
+	})
+
+	it('a surface too small for the extras still shows the essential two', async () => {
+		const { url } = await startStack()
+
+		const first = await connectClient(url)
+		await first.addDevice('shared:id', { KEYS_TOTAL: 2, KEYS_PER_ROW: 2, COLORS: 'hex', TEXT: 1 })
+		await first.waitForCount('KEY-STATE', 2)
+
+		const second = await connectClient(url)
+		await second.addDevice('shared:id', { KEYS_TOTAL: 2, KEYS_PER_ROW: 2, COLORS: 'hex', TEXT: 1 })
+		const states = await second.waitForCount('KEY-STATE', 2, 5000)
+		const texts = states.map((message) => decode(message.params.TEXT)).join(' ')
+
+		// Priority order matters: the reason must survive on a surface with no room for the rest.
+		expect(texts).toContain("CAN'T")
+		expect(texts).toContain('ID IN')
+	})
+})

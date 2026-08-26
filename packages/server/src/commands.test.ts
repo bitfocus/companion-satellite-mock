@@ -39,8 +39,8 @@ async function startServer(
 	return { server, url: `ws://127.0.0.1:${server.address!.port}/ws/satellite` }
 }
 
-async function connect(url: string): Promise<Client> {
-	const socket = new WebSocket(url)
+async function connect(url: string, query = ''): Promise<Client> {
+	const socket = new WebSocket(url + query)
 	sockets.push(socket)
 	const lines: string[] = []
 	socket.on('message', (data) => {
@@ -163,7 +163,26 @@ describe('ADD-DEVICE', () => {
 		)
 	})
 
-	it('tells the EXISTING connection when another claims its device id, and the new one nothing', async () => {
+	it('under ?duplicates=strict, tells the EXISTING connection and the new one nothing', async () => {
+		const { url } = await startServer()
+		const first = await connect(url, '?duplicates=strict')
+		first.send(ADD)
+		await first.waitFor('ADD-DEVICE OK')
+		first.lines.length = 0
+
+		const second = await connect(url, '?duplicates=strict')
+		second.lines.length = 0
+		second.send(ADD)
+
+		expect(await first.waitFor('ADD-DEVICE')).toBe(
+			'ADD-DEVICE ERROR DEVICEID="dev1" MESSAGE="Device exists elsewhere"'
+		)
+		await settle()
+		// Companion's silence, reproduced exactly. This is what a client must survive in production.
+		expect(second.received.filter((l) => l.startsWith('ADD-DEVICE'))).toEqual([])
+	})
+
+	it('by default accepts the second connection so it can be told why it cannot pair', async () => {
 		const { url } = await startServer()
 		const first = await connect(url)
 		first.send(ADD)
@@ -174,11 +193,39 @@ describe('ADD-DEVICE', () => {
 		second.lines.length = 0
 		second.send(ADD)
 
+		// The holder is still told, exactly as under strict — it is entitled to know.
 		expect(await first.waitFor('ADD-DEVICE')).toBe(
 			'ADD-DEVICE ERROR DEVICEID="dev1" MESSAGE="Device exists elsewhere"'
 		)
+		// ...and the newcomer gets an answer instead of a dead end.
+		expect(await second.waitFor('ADD-DEVICE')).toBe('ADD-DEVICE OK DEVICEID="dev1"')
+	})
+
+	it('the friendly path does not let the second connection take over the id', async () => {
+		const { url, server } = await startServer()
+		const first = await connect(url)
+		first.send(ADD)
+		await first.waitFor('ADD-DEVICE OK')
+
+		const second = await connect(url)
+		second.send(ADD)
+		await second.waitFor('ADD-DEVICE OK')
 		await settle()
-		expect(second.received.filter((l) => l.startsWith('ADD-DEVICE'))).toEqual([])
+
+		// One registration, still owned by the connection that got there first. Accepting the
+		// newcomer must never become a way to hijack a surface.
+		expect(server.devices.size).toBe(1)
+
+		// Ownership proven by who can drive it, rather than by comparing the single registration
+		// against itself. The first connection still can...
+		first.lines.length = 0
+		first.send('KEY-PRESS DEVICEID="dev1" KEY=0 PRESSED=1')
+		expect(await first.waitFor('KEY-PRESS')).toBe('KEY-PRESS OK DEVICEID="dev1"')
+
+		// ...and the second, holding only a drawable surface, cannot.
+		second.lines.length = 0
+		second.send('KEY-PRESS DEVICEID="dev1" KEY=0 PRESSED=1')
+		expect(await second.waitFor('KEY-PRESS')).toContain('Device not found')
 	})
 
 	it('registers an advanced surface from a layout manifest', async () => {
