@@ -11,6 +11,9 @@
     "build": "tsc --build"
   },
   "dependencies": {
-    "zod": "^4.1.5"
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0"
   }
 }
