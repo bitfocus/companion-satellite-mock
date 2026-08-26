@@ -20,17 +20,6 @@ export interface Device {
 	firmwareUpdateUrl: string | null
 }
 
-export type AddDeviceResult =
-	| { ok: true }
-	/** The id is taken on this same connection — the requesting socket is told. */
-	| { ok: false; reason: 'already-added' }
-	/**
-	 * The id is taken on a *different* connection. Upstream tells the EXISTING socket, and sends the
-	 * requesting one nothing at all — a quirk, but one a client may well be relying on to notice it
-	 * has been displaced.
-	 */
-	| { ok: false; reason: 'exists-elsewhere'; existing: Device }
-
 /**
  * Registry of every device across every connection.
  *
@@ -54,15 +43,22 @@ export class DeviceRegistry {
 		return device && device.connection === connection ? device : undefined
 	}
 
-	add(device: Device): AddDeviceResult {
-		const existing = this.#devices.get(device.id)
-		if (existing) {
-			return existing.connection === device.connection
-				? { ok: false, reason: 'already-added' }
-				: { ok: false, reason: 'exists-elsewhere', existing }
-		}
+	/**
+	 * Register a device. An id that is already taken is left alone and `false` is returned.
+	 *
+	 * The duplicate *rules* deliberately live in the ADD-DEVICE handler, not here, because which
+	 * socket is told what depends on error ordering: upstream checks for a duplicate before parsing
+	 * `LAYOUT_MANIFEST`, so a request that is both a duplicate and malformed reports the duplicate.
+	 * Enforcing that here would move the check after the surface is built and silently change which
+	 * error a client sees.
+	 *
+	 * This still refuses to overwrite, so if that handler check ever regresses the failure is a
+	 * device that will not register rather than one client silently taking over another's id.
+	 */
+	add(device: Device): boolean {
+		if (this.#devices.has(device.id)) return false
 		this.#devices.set(device.id, device)
-		return { ok: true }
+		return true
 	}
 
 	remove(id: string): boolean {
