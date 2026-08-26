@@ -82,9 +82,31 @@ limits on IPv6 are theatre.
 
 ## Privacy on a shared instance
 
-The public UI lists nothing: no other people's sessions, device ids, or IP addresses. Full session
-detail requires the claim code. IPs in logs are hashed with a per-process salt, so two connections
-can be correlated within a run without the log becoming a record of who connected from where.
+The public UI lists nothing: no other people's sessions, device ids, or IP addresses — not even
+hashed ones. Full session detail requires the claim code, and no API returns an address.
+
+**Server logs are different, deliberately.** They record the real client address by default, because
+the hashed form cannot answer the question an operator actually has after an incident: was this the
+same address as last week? The salt is per-process, so it changes on every restart and correlation
+dies with it. Each line therefore carries both — `ip` (hashed, stable within a run, safe to quote
+anywhere) and `clientIp` (the address itself).
+
+Set `LOG_CLIENT_IPS=0` to drop `clientIp`; the hash and all correlation within a run survive. Note
+that addresses are personal data in most jurisdictions, so whatever ships or stores these logs wants
+a retention policy — this server keeps nothing on disk itself.
+
+What is recorded, and why it is the useful set for chasing abuse:
+
+| Event                  | Fields                                                                   |
+| ---------------------- | ------------------------------------------------------------------------ |
+| connection refused     | address, refusal reason, user-agent, forwarded-for chain                 |
+| connection opened      | address, connection id, user-agent, negotiated API version               |
+| connection closed      | duration, bytes in/out, messages in, devices registered                  |
+| blackout started       | address, duration                                                        |
+| limit trips, bad lines | inherited from the connection's logger, so they carry its address and id |
+
+The forwarded-for chain is logged only when `TRUSTED_PROXY_HOPS` is set, since it is attacker-
+controlled otherwise and would be a way to write arbitrary strings into the log.
 
 ## Before going public
 

@@ -11,7 +11,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { Config } from './config.js'
 import { ReconnectBlackout, MAX_BLACKOUT_MS } from './blackout.js'
 import { ConnectionRegistry, resolveClientIp } from './limits.js'
-import { hashIp, type Logger } from './logging.js'
+import { ipFields, type Logger } from './logging.js'
 import { buildCommandHandlers } from './commands.js'
 import { DeviceRegistry } from './devices.js'
 import type { SatelliteEvents } from './events.js'
@@ -91,7 +91,7 @@ export class SatelliteServer {
 	 */
 	blackoutIp(ip: string, durationMs: number): number {
 		const until = this.#blackout.add(ip, durationMs)
-		this.#logger.info({ ip: hashIp(ip), untilMs: until - Date.now() }, 'reconnect blackout started')
+		this.#logger.info({ ...this.#ipFields(ip), untilMs: until - Date.now() }, 'reconnect blackout started')
 		return until
 	}
 
@@ -136,6 +136,7 @@ export class SatelliteServer {
 			)
 
 			if (this.#blackout.blocks(ip)) {
+				this.#logger.info({ ...this.#ipFields(ip) }, 'connection refused: blackout')
 				// 1013 rather than a terminate: the blackout is a test of how the client backs off, and
 				// a code it can read is part of what is being tested.
 				socket.close(1013, 'blackout')
@@ -144,7 +145,18 @@ export class SatelliteServer {
 
 			const admission = this.#registry.admit(ip)
 			if (!admission.ok) {
-				this.#logger.warn({ ip: hashIp(ip), reason: admission.reason }, 'connection refused')
+				// The most forensically useful line here: a refusal is the shape abuse actually takes,
+				// and it is the one event with no connection to attach later detail to.
+				this.#logger.warn(
+					{
+						...this.#ipFields(ip),
+						reason: admission.reason,
+						userAgent: request.headers['user-agent'],
+						forwardedFor:
+							this.#config.TRUSTED_PROXY_HOPS > 0 ? request.headers['x-forwarded-for'] : undefined,
+					},
+					'connection refused'
+				)
 				// Close rather than terminate, so a legitimate client sees a clean close and can back
 				// off, instead of an ambiguous socket error it will retry immediately.
 				socket.close(1013, admission.reason)
@@ -183,7 +195,7 @@ export class SatelliteServer {
 		// Every connection goes through the chaos wrapper, configured to do nothing until someone
 		// turns a knob on. Wrapping unconditionally keeps one code path rather than two.
 		const connection = new ChaosConnection(raw, DEFAULT_CHAOS)
-		const logger = this.#logger.child({ connection: raw.id, ip: hashIp(ip) })
+		const logger = this.#logger.child({ connection: raw.id, ...this.#ipFields(ip) })
 
 		const profile = this.#capabilitiesFor(request)
 		const session = new SatelliteSession({
@@ -204,7 +216,17 @@ export class SatelliteServer {
 		this.#chaosByConnection.set(session, connection)
 		this.#sessions.add(session)
 		this.#events.onConnectionOpen?.(session)
-		logger.info({ total: this.#sessions.size }, 'connection opened')
+		logger.info(
+			{
+				total: this.#sessions.size,
+				// Recorded once per connection rather than per line: enough to tell one client from
+				// another after the fact without the log becoming a transcript.
+				userAgent: request.headers['user-agent'],
+				forwardedFor: this.#config.TRUSTED_PROXY_HOPS > 0 ? request.headers['x-forwarded-for'] : undefined,
+				apiVersion: profile.capabilities.apiVersion,
+			},
+			'connection opened'
+		)
 
 		// Teardown is anchored on 'close', which node guarantees fires exactly once, and is registered
 		// before anything that could throw — otherwise a failed handshake would leak the registry slot.
@@ -215,7 +237,15 @@ export class SatelliteServer {
 			this.#sessions.delete(session)
 			this.#registry.release(ip)
 			logger.info(
-				{ total: this.#sessions.size, devices: removed.length, bytesIn: raw.bytesReceived },
+				{
+					total: this.#sessions.size,
+					devices: removed.length,
+					bytesIn: raw.bytesReceived,
+					bytesOut: raw.bytesSent,
+					messagesIn: raw.messagesReceived,
+					// So a short-lived flood is distinguishable from one long-lived connection.
+					durationMs: Date.now() - raw.openedAt,
+				},
 				'connection closed'
 			)
 		})
@@ -233,6 +263,11 @@ export class SatelliteServer {
 			logger.error({ err: error }, 'handshake failed')
 			session.close()
 		}
+	}
+
+	/** Address fields for a log line, honouring LOG_CLIENT_IPS. */
+	#ipFields(ip: string) {
+		return ipFields(ip, this.#config.LOG_CLIENT_IPS === 1)
 	}
 
 	/**

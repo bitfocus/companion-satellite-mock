@@ -26,6 +26,17 @@ export function hashIp(ip: string): string {
 	return 'ip:' + createHash('sha256').update(SALT).update(ip).digest('hex').slice(0, 8)
 }
 
+/**
+ * The address fields to attach to a log line.
+ *
+ * Two audiences, deliberately separated. `ip` is the hash and is safe anywhere, including anything
+ * that might reach a browser; `clientIp` is the real address and exists only so an operator can
+ * answer questions about past abuse, which the hash cannot — it is re-salted on every restart.
+ */
+export function ipFields(ip: string, includeRaw: boolean): { ip: string; clientIp?: string } {
+	return includeRaw ? { ip: hashIp(ip), clientIp: ip } : { ip: hashIp(ip) }
+}
+
 /** Truncate a value for logging, so a 2MB line can't end up in the log stream. */
 export function truncate(value: string, max = 200): string {
 	return value.length <= max ? value : `${value.slice(0, max)}…(${value.length} bytes)`

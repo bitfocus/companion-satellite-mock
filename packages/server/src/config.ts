@@ -39,6 +39,17 @@ export const ConfigSchema = z.object({
 	 */
 	TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(4).default(0),
 
+	/**
+	 * Log the real client address alongside the hashed one.
+	 *
+	 * On by default because the hash alone cannot answer "was this the same address last week?" —
+	 * its salt is per-process, so it changes on every restart and abuse cannot be traced across one.
+	 * Set to 0 on a deployment where retaining addresses is not wanted; the hash still correlates
+	 * connections within a run. Addresses are personal data in most jurisdictions, so whatever ships
+	 * these logs should have a retention policy.
+	 */
+	LOG_CLIENT_IPS: z.coerce.number().int().min(0).max(1).default(1),
+
 	/** Abuse limits. */
 	MAX_LINE_BYTES: positive(256 * 1024),
 	/**
