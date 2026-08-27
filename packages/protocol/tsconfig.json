@@ -3,6 +3,10 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
+    // This package uses `Buffer` for base64, so it needs node's types named explicitly. They are not
+    // picked up otherwise: automatic @types discovery does not reach this package from the workspace
+    // root, and the ambient `Buffer` declaration lives in them. Declared in package.json too rather
+    // than borrowed from the hoisted root install, which would break under a different linker.
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],

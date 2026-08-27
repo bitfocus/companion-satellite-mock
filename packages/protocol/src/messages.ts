@@ -1,6 +1,3 @@
-// Imported explicitly rather than relying on the global: @types/node 26 no longer declares `Buffer`
-// ambiently, and this package deliberately does not pull in the full node global environment.
-import { Buffer } from 'node:buffer'
 import type { BitmapFormat } from './constants.js'
 import { serialiseMessage, type MessageArgs, type SerialiseOptions } from './serialise.js'
 import type { SatelliteCapabilities } from './versions.js'

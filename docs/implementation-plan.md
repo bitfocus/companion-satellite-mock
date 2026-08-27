@@ -20,7 +20,8 @@ Estimates are relative sizes (S/M/L), not calendar time.
 4. ~~**Spike `@napi-rs/canvas` on Node 26**~~ — **done**, results in
    [design.md §6](./design.md#6-rendering). It loads from prebuilds on Node 26.7.0 x64 with no build
    step; use `canvas.data()` (premultiplied — keep buttons opaque) over `getImageData()`; PNG is
-   14× smaller than raw RGB, though not cheaper — see the correction in design.md §6. Still to confirm on the deploy architecture if it is
+   14× smaller than raw RGB, and worth preferring for that reason rather than for CPU — see the
+   correction in design.md §6. Still to confirm on the deploy architecture if it is
    arm64, and inside the final container image.
 5. Dockerfile (multi-stage, non-root, read-only rootfs, `--init`, healthcheck) and a
    `docker-compose.yml` with a Caddy TLS front end as the deployment reference.

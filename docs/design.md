@@ -260,19 +260,30 @@ Three conclusions:
    - Unit-test both paths against a **semi-transparent fixture**, not just an opaque one. An opaque
      fixture passes under either mistake, which is exactly how this class of bug survives review.
 
-3. **PNG is 14× smaller on the wire and several times more expensive to produce.** It is a genuine
-   trade — CPU for bandwidth — not a free win.
+3. **Prefer `png`/`webp` whenever the client can decode them.** `rgb` is the compatibility path.
 
-   An earlier version of this section claimed the opposite: that the PNG encode cost _less_ than the
-   RGBA→RGB conversion it replaces, and that `png` was therefore the format to prefer. That was
-   wrong, and wrong against the table printed directly above it. The likely cause is that PNG was
-   compared against the _naive_ `getImageData()` conversion and never re-compared after conclusion 1
-   made the rgb path an order of magnitude faster. Do not repeat the advice to client authors.
+   That is what this section originally said, and the recommendation was right — but the reason
+   given for it was not. It claimed the PNG encode cost _less_ than the RGBA→RGB conversion it
+   replaces, which is false, and false against the table above: the conversion is ~0.030 ms and the
+   encode ~0.410 ms, so the encode is roughly 14× the conversion.
 
-   The honest guidance: **`rgb` is the cheap path for the server, `png` is the cheap path for the
-   network.** On a LAN, or anywhere the server is CPU-bound, prefer `rgb`. Over the internet, or with
-   many large surfaces, the 14× bandwidth saving is worth the CPU. Neither is "the fast path"
-   unqualified.
+   Correcting that, this section then briefly swung to "it depends — `rgb` on a LAN, `png` over the
+   internet". That over-corrected. Only the reasoning was wrong; the recommendation was not. Put the
+   two costs side by side for a 32-key surface at 30 fps with every button unique — the worst case,
+   since the render cache means most frames redraw far less:
+
+   | format | wire                   | CPU            |
+   | ------ | ---------------------- | -------------- |
+   | `rgb`  | 14.9 MB/s (119 Mbit/s) | 2.9% of a core |
+   | `png`  | 1.1 MB/s (8.7 Mbit/s)  | 39% of a core  |
+
+   PNG buys a 110 Mbit/s saving for about a third of one core. There is no network worth having
+   where that is the wrong trade, and 119 Mbit/s for a _single_ surface rules `rgb` out of anything
+   but a LAN. The CPU side is also the cacheable side: identical styles are served from the render
+   cache and encode nothing at all, while the bytes go out every time regardless.
+
+   So the guidance to client authors stands: **negotiate `png` or `webp` if you can decode them.**
+   Reach for `rgb` when you cannot, not because it is faster.
 
    `@julusian/image-rs` was evaluated as a native replacement for the conversion loop and is _not_
    used: measured against the shipping loop it was within noise (~1.05×), because at ~0.030 ms the
