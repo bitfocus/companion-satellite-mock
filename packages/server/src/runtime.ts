@@ -175,7 +175,7 @@ export class MockRuntime {
 		const session = this.sessions.attach(connection, device.id)
 		this.sessions.noteDevice(session, device)
 
-		const budget = new RenderBudget(this.#config.MAX_BYTES_PER_SECOND * 4)
+		const budget = new RenderBudget(this.#config.MAX_BYTES_PER_SECOND * 4, surfacePixels(device))
 		const emitter = new SurfaceEmitter({
 			device,
 			connection: connection.connection,
@@ -220,7 +220,7 @@ export class MockRuntime {
 			connection: connection.connection,
 			capabilities: connection.capabilities,
 			renderer: this.renderer,
-			budget: new RenderBudget(this.#config.MAX_BYTES_PER_SECOND * 4),
+			budget: new RenderBudget(this.#config.MAX_BYTES_PER_SECOND * 4, surfacePixels(device)),
 			onOverflow: () => connection.close(),
 		})
 
@@ -239,4 +239,18 @@ export class MockRuntime {
 		this.#devices.delete(device.id)
 		if (runtime) this.sessions.detach(runtime.session)
 	}
+}
+
+/**
+ * Total bitmap pixels in one full repaint of a surface.
+ *
+ * Used to size the render budget's burst so a cold full-surface paint always fits (see RenderBudget).
+ * Controls the client did not ask a bitmap for contribute nothing.
+ */
+function surfacePixels(device: Device): number {
+	let total = 0
+	for (const control of device.surface.controls.values()) {
+		if (control.style.bitmap) total += control.style.bitmap.w * control.style.bitmap.h
+	}
+	return total
 }

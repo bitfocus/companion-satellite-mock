@@ -173,6 +173,39 @@ describe('SurfaceEmitter', () => {
 		expect(connection.sentLines[0]).toContain('COLOR="#123456"')
 	})
 
+	it('defers over-budget bitmaps and drains them as the budget refills, never sending a bitmap-only key blank', () => {
+		// The bug this guards: a full paint of a large surface drains the budget mid-flush, and the tail
+		// keys were sent as bitmap-less KEY-STATE messages — which on a bitmap-only surface paint
+		// nothing, leaving those keys blank until something else redrew them. They must be held and
+		// retried instead. A fake clock stands in for the token bucket refilling over time.
+		let now = 0
+		const connection = fakeConnection()
+		const device = makeDevice('KEYS_TOTAL=4 KEYS_PER_ROW=2 BITMAPS=64', { connection })
+		const emitter = new SurfaceEmitter({
+			device,
+			connection,
+			capabilities: caps,
+			// Rate = one 64×64 key per second; burst = two. So the first flush can afford two of the four.
+			budget: new RenderBudget(4096, 8192, () => now),
+			renderer: new ButtonRenderer(),
+		})
+
+		emitter.drawAll({ bgColor: '#334455' })
+		emitter.flush()
+
+		// Two keys fit the burst; the other two are held back, not emitted blank.
+		expect(connection.sentLines).toHaveLength(2)
+		expect(connection.sentLines.every((line) => line.includes('BITMAP='))).toBe(true)
+		expect(emitter.stats.pending).toBe(2)
+
+		// The bucket refills; the held keys now go out, each with its bitmap.
+		now = 2000
+		emitter.flush()
+		expect(connection.sentLines).toHaveLength(4)
+		expect(connection.sentLines.every((line) => line.includes('BITMAP='))).toBe(true)
+		expect(emitter.stats.pending).toBe(0)
+	})
+
 	it('drops the queue and reports overflow when the socket is backed up', async () => {
 		let overflowed = false
 		const connection = fakeConnection(10 * 1024 * 1024)

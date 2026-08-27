@@ -21,6 +21,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "yarn workspace @satellite-mock/server dev",
+    "dev:ui": "yarn workspace @satellite-mock/webui dev",
     "check": "yarn format:check && yarn lint && yarn typecheck && yarn test",
     "smoke": "node scripts/smoke.mjs",
     "test:e2e": "yarn build && yarn workspace @satellite-mock/webui build && yarn workspace @satellite-mock/e2e test"

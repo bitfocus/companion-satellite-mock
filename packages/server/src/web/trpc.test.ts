@@ -106,7 +106,7 @@ describe('authorisation', () => {
 		const { owner, sessionId } = await claimed()
 		const snapshot = await owner.session({ sessionId })
 		expect(snapshot?.device?.id).toBe('dev1')
-		await expect(owner.selectScenario({ sessionId, scenarioId: 'companion-home' })).resolves.toEqual({ ok: true })
+		await expect(owner.selectScenario({ sessionId, scenarioId: 'colour-text' })).resolves.toEqual({ ok: true })
 	})
 
 	it('refuses another browser, even though session contents are not secret', async () => {
@@ -192,7 +192,7 @@ describe('session data for the UI', () => {
 	it('lists the scenario catalogue', async () => {
 		const { owner } = await claimed()
 		const scenarios = await owner.scenarios()
-		expect(scenarios.map((s) => s.id)).toContain('companion-home')
+		expect(scenarios.map((s) => s.id)).toContain('colour-text')
 		expect(scenarios.every((s) => s.description.length > 0)).toBe(true)
 	})
 })

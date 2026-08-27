@@ -61,8 +61,12 @@ export class SurfaceEmitter {
 	/** Controls awaiting a flush. A Set, because the style itself lives in #styles — latest wins. */
 	readonly #pending = new Set<string>()
 	#flushScheduled = false
+	#retryTimer: ReturnType<typeof setTimeout> | undefined
 	#sent = 0
 	#coalesced = 0
+
+	/** How long to wait before retrying a budget-deferred frame, letting the bucket refill first. */
+	static readonly RETRY_MS = 33
 
 	constructor(options: EmitterOptions) {
 		this.#device = options.device
@@ -119,6 +123,7 @@ export class SurfaceEmitter {
 		const pending = [...this.#pending]
 		this.#pending.clear()
 
+		let deferred = false
 		for (const controlId of pending) {
 			const control = this.#device.surface.controls.get(controlId)
 			if (!control) continue
@@ -126,6 +131,15 @@ export class SurfaceEmitter {
 			const style = this.styleOf(controlId)
 			const args = this.#buildArgs(controlId, style)
 			if (!args) continue
+
+			if (args.bitmapDeferred) {
+				// Leave it queued; a later flush, once the bucket has refilled, sends it with its
+				// bitmap. Coalescing keeps the backlog to one frame per control, so this cannot grow
+				// without bound even while a scenario keeps redrawing faster than the budget allows.
+				this.#pending.add(controlId)
+				deferred = true
+				continue
+			}
 
 			this.#send(
 				buildKeyState({
@@ -140,6 +154,8 @@ export class SurfaceEmitter {
 			)
 			this.#sent++
 		}
+
+		if (deferred) this.#scheduleRetry()
 	}
 
 	#buildArgs(controlId: string, style: ButtonStyle) {
@@ -152,9 +168,8 @@ export class SurfaceEmitter {
 			type: style.type,
 		}
 
+		let bitmapDeferred = false
 		if (preset.bitmap) {
-			// Over budget: skip the bitmap rather than the whole message, so colour and text still
-			// update and the surface stays responsive under load.
 			if (this.#budget.tryConsume(preset.bitmap.w, preset.bitmap.h)) {
 				values.bitmap = this.#renderer.render(style, {
 					width: preset.bitmap.w,
@@ -162,7 +177,15 @@ export class SurfaceEmitter {
 					format: this.#device.bitmapFormat,
 					rotation: this.#rotation,
 				})
+			} else if (this.#budget.canEverAfford(preset.bitmap.w, preset.bitmap.h)) {
+				// Momentarily over budget, but the bucket will refill enough to hold this frame. Defer
+				// the whole key and retry rather than sending it now without a bitmap: on a bitmap-only
+				// surface a bitmap-less KEY-STATE paints nothing, so the key would sit blank until
+				// something happened to redraw it. flush() re-queues it and a timer drains the backlog.
+				bitmapDeferred = true
 			}
+			// else: one frame larger than the entire budget can never fit. Fall through and send what
+			// we can (colour/text) — deferring it would retry forever — matching the old drop behaviour.
 		}
 
 		if (preset.colors) {
@@ -175,7 +198,7 @@ export class SurfaceEmitter {
 			values.leds = sampleLedsToBuffer(style.gauge, preset.leds.segments, preset.leds.mode).toString('base64')
 		}
 
-		return { values }
+		return { values, bitmapDeferred }
 	}
 
 	#scheduleFlush(): void {
@@ -183,6 +206,17 @@ export class SurfaceEmitter {
 		this.#flushScheduled = true
 		// A microtask, so a scenario touching twenty controls in one tick produces one flush.
 		queueMicrotask(() => this.flush())
+	}
+
+	#scheduleRetry(): void {
+		if (this.#retryTimer) return
+		// A real delay, not a microtask: the point is to wait for the token bucket to refill. unref so a
+		// pending retry never keeps the process alive on its own.
+		this.#retryTimer = setTimeout(() => {
+			this.#retryTimer = undefined
+			this.flush()
+		}, SurfaceEmitter.RETRY_MS)
+		this.#retryTimer.unref?.()
 	}
 
 	#isOverflowing(): boolean {
@@ -193,6 +227,10 @@ export class SurfaceEmitter {
 	clearKeys(): void {
 		this.#pending.clear()
 		this.#styles.clear()
+		if (this.#retryTimer) {
+			clearTimeout(this.#retryTimer)
+			this.#retryTimer = undefined
+		}
 		this.#send(buildKeysClear(this.#device.id))
 	}
 

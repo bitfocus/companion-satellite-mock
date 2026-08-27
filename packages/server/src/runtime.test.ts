@@ -124,11 +124,11 @@ describe('scenarios over the wire', () => {
 
 	it('switches scenario and redraws the surface', async () => {
 		const { client, runtime } = await withSurface()
-		expect(runtime.selectScenario('dev1', 'companion-home')).toBe(true)
+		expect(runtime.selectScenario('dev1', 'colour-text')).toBe(true)
 
 		await client.waitFor('KEYS-CLEAR')
 		const states = await client.waitForCount('KEY-STATE', 8)
-		expect(states.map((m) => decode(m.params.TEXT)).join(' ')).toContain('CAM 1')
+		expect(states.map((m) => decode(m.params.TEXT)).join(' ')).toContain('MiXeD CaSe')
 	})
 
 	it('rejects an unknown scenario id', async () => {

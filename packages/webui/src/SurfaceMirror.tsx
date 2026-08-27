@@ -33,10 +33,20 @@ export function SurfaceMirror({
 			</h2>
 			<div
 				className="grid"
-				style={{ gridTemplateColumns: `repeat(${Math.max(1, gridSize.columns)}, minmax(0, 1fr))` }}
+				style={{
+					gridTemplateColumns: `repeat(${Math.max(1, gridSize.columns)}, minmax(0, 1fr))`,
+					gridTemplateRows: `repeat(${Math.max(1, gridSize.rows)}, minmax(0, 1fr))`,
+				}}
 			>
 				{tiles.map((tile) => (
-					<figure key={tile.id} className={tile.style.pressed ? 'tile pressed' : 'tile'}>
+					<figure
+						key={tile.id}
+						className={tile.style.pressed ? 'tile pressed' : 'tile'}
+						// Place each tile at its real coordinate. The client may declare controls in any
+						// order, and a manifest surface may have gaps; flowing them in array order scrambles
+						// both. 1-based because CSS grid lines start at 1.
+						style={{ gridColumn: tile.column + 1, gridRow: tile.row + 1 }}
+					>
 						<img src={tile.preview} alt={tile.style.text || tile.id} />
 						<figcaption>
 							<span className="tile-id">{tile.id}</span>

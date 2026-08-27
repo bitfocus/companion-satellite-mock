@@ -150,93 +150,7 @@ export const inputEchoScenario: Scenario = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 3. Companion home — the believable-looking one, for demos and screenshots.
-// ---------------------------------------------------------------------------------------------
-
-const HOME_LABELS = [
-	'CAM 1',
-	'CAM 2',
-	'CAM 3',
-	'CAM 4',
-	'ATEM\nPGM',
-	'ATEM\nPVW',
-	'REC',
-	'STREAM',
-	'VT 1',
-	'VT 2',
-	'AUDIO\nMUTE',
-	'LOWER\nTHIRD',
-	'TITLES',
-	'REPLAY',
-	'BUG\nON',
-	'FADE\nOUT',
-]
-
-export const companionHomeScenario: Scenario = {
-	id: 'companion-home',
-	name: 'Companion home',
-	description:
-		'A believable Companion page: page up/down/number keys, realistic labels and press latching. ' +
-		'The scenario to use for screenshots and a demo video.',
-	wants: ['colors', 'text', 'bitmaps'],
-
-	init(context) {
-		const { columns } = context.gridSize
-
-		context.controlIds.forEach((controlId, index) => {
-			// The last column becomes page navigation when the surface is wide enough for it, which is
-			// how a Stream Deck page row is usually laid out.
-			const column = columns > 0 ? index % columns : 0
-			const isNavColumn = columns >= 4 && column === columns - 1
-			const row = columns > 0 ? Math.floor(index / columns) : index
-
-			if (isNavColumn && row === 0) {
-				context.draw(controlId, { type: 'PAGEUP', bgColor: '#202020', textColor: '#ffffff', text: '' })
-				return
-			}
-			if (isNavColumn && row === 1) {
-				context.draw(controlId, { type: 'PAGENUM', bgColor: '#202020', textColor: '#ffffff', text: '1' })
-				return
-			}
-			if (isNavColumn && row === 2) {
-				context.draw(controlId, { type: 'PAGEDOWN', bgColor: '#202020', textColor: '#ffffff', text: '' })
-				return
-			}
-
-			const label = HOME_LABELS[index % HOME_LABELS.length] ?? ''
-			context.draw(controlId, {
-				type: 'BUTTON',
-				bgColor: '#1b1b22',
-				textColor: '#e0e0e0',
-				text: label,
-			})
-		})
-	},
-
-	onPress(context, controlId, pressed) {
-		// Latching, so a press leaves visible state rather than flickering.
-		const key = `latched:${controlId}`
-		if (pressed) {
-			const latched = !(context.state.get(key) as boolean)
-			context.state.set(key, latched)
-			context.draw(controlId, { bgColor: latched ? '#b00000' : '#1b1b22', pressed: true })
-		} else {
-			context.draw(controlId, { pressed: false })
-		}
-	},
-
-	onChangePage(context, forward) {
-		const page = Math.max(1, ((context.state.get('page') as number) ?? 1) + (forward ? 1 : -1))
-		context.state.set('page', page)
-		for (const controlId of context.controlIds) {
-			context.draw(controlId, {})
-		}
-		context.log(`page changed to ${page}`)
-	},
-}
-
-// ---------------------------------------------------------------------------------------------
-// 4. Colour and text matrix.
+// 3. Colour and text matrix.
 // ---------------------------------------------------------------------------------------------
 
 const TEXT_SAMPLES = [
@@ -275,7 +189,7 @@ export const colourTextScenario: Scenario = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 5. Bitmap torture.
+// 4. Bitmap torture.
 // ---------------------------------------------------------------------------------------------
 
 export const bitmapTortureScenario: Scenario = {
@@ -303,7 +217,7 @@ export const bitmapTortureScenario: Scenario = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 6. Encoder lab.
+// 5. Encoder lab.
 // ---------------------------------------------------------------------------------------------
 
 export const encoderLabScenario: Scenario = {
@@ -340,7 +254,7 @@ export const encoderLabScenario: Scenario = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 7. Pincode lock.
+// 6. Pincode lock.
 // ---------------------------------------------------------------------------------------------
 
 const PIN = '1234'
@@ -391,7 +305,7 @@ export const pincodeScenario: Scenario = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 8. Brightness.
+// 7. Brightness.
 // ---------------------------------------------------------------------------------------------
 
 export const brightnessScenario: Scenario = {
@@ -425,7 +339,7 @@ export const brightnessScenario: Scenario = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 9. Variables.
+// 8. Variables.
 // ---------------------------------------------------------------------------------------------
 
 export const variablesScenario: Scenario = {
@@ -468,7 +382,7 @@ export const variablesScenario: Scenario = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 10. Attract — the slow pretty one, for an unattended demo.
+// 9. Attract — the slow pretty one, for an unattended demo.
 // ---------------------------------------------------------------------------------------------
 
 export const attractScenario: Scenario = {
@@ -528,7 +442,6 @@ export function hslToHex(h: number, s: number, l: number): string {
 /** Every scenario that does not need construction. The Unclaimed one takes a claim code. */
 export const BUILTIN_SCENARIOS: readonly Scenario[] = [
 	inputEchoScenario,
-	companionHomeScenario,
 	colourTextScenario,
 	bitmapTortureScenario,
 	encoderLabScenario,
