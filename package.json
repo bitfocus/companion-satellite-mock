@@ -1,6 +1,7 @@
 {
   "name": "companion-satellite-mock",
   "version": "0.0.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "packageManager": "yarn@4.10.3",
