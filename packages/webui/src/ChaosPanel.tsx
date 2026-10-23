@@ -118,11 +118,14 @@ export function ChaosPanel({ sessionId, connected }: { sessionId: string; connec
 }
 
 /** Builds the URL that selects an older server, since the version is fixed when the socket opens. */
-export function VersionPanel({
-	apiVersions,
-}: {
-	apiVersions: readonly { version: string; companion: string | null }[]
-}) {
+export function VersionPanel() {
+	const [apiVersions, setApiVersions] = useState<readonly { version: string; companion: string | null }[]>([])
+	useEffect(() => {
+		trpc.server.query().then(
+			(info) => setApiVersions(info.apiVersions),
+			() => setApiVersions([])
+		)
+	}, [])
 	const [version, setVersion] = useState('')
 	const [subs, setSubs] = useState(true)
 	const [formats, setFormats] = useState('')

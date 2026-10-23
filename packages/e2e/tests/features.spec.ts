@@ -1,5 +1,5 @@
 import { TestSatelliteClient } from '@satellite-mock/testclient'
-import { claim, decodeText, expect, readClaimCode, test } from './fixtures.js'
+import { claim, decodeText, expect, openTab, readClaimCode, test } from './fixtures.js'
 
 /**
  * Device config and subscriptions, through the UI.
@@ -82,6 +82,7 @@ test.describe('device config', () => {
 			await page.fill('input[aria-label="Claim code"]', code)
 			await page.click('button[type="submit"]')
 			await page.waitForSelector('.grid img')
+			await openTab(page, 'Device')
 
 			const panel = page.getByTestId('config-panel')
 			await expect(panel).toContainText('Label')
@@ -101,6 +102,7 @@ test.describe('device config', () => {
 
 	test('says so plainly when the client declared no fields', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Device')
 		await expect(page.getByTestId('config-panel')).toContainText('declared no')
 	})
 })
@@ -108,6 +110,7 @@ test.describe('device config', () => {
 test.describe('subscriptions', () => {
 	test('lists a subscription and pushes content to the location it watches', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Subscriptions')
 
 		// The fixture's client holds the claimed session, so its subscription is the one listed.
 		stack.client.sendMessage('ADD-SUB', { SUBID: 'watch/1', LOCATION: '4/1/2', COLORS: 'hex', TEXT: 1 })
@@ -128,6 +131,7 @@ test.describe('subscriptions', () => {
 
 	test('says so plainly when the client has none', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Subscriptions')
 		await expect(page.getByTestId('subscriptions-panel')).toContainText('no subscriptions')
 	})
 })
@@ -142,6 +146,7 @@ test.describe('subscriptions', () => {
 test.describe('disconnect and reconnect', () => {
 	test('closes with the status code the operator chose', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 
 		const closed = new Promise<number>((resolve) => stack.client.once('close', (code) => resolve(code)))
 
@@ -155,6 +160,7 @@ test.describe('disconnect and reconnect', () => {
 
 	test('refuses the client back while the blackout runs, then lets it in', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 
 		const closed = new Promise<void>((resolve) => stack.client.once('close', () => resolve()))
 		await page.getByTestId('blackout-seconds').fill('3')
@@ -192,6 +198,7 @@ test.describe('disconnect and reconnect', () => {
 
 	test('clearing the blackout lets the client straight back in', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 
 		const closed = new Promise<void>((resolve) => stack.client.once('close', () => resolve()))
 		await page.getByTestId('blackout-seconds').fill('60')

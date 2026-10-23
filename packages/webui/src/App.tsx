@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { trpc } from './trpc.js'
 import { SurfaceMirror } from './SurfaceMirror.js'
 import { TracePanel } from './TracePanel.js'
-import { Sidebar } from './Sidebar.js'
+import { ScenarioPanel } from './ScenarioPanel.js'
+import { SubscriptionsPanel } from './SubscriptionsPanel.js'
+import { RawPanel } from './RawPanel.js'
+import { ChaosPanel, VersionPanel } from './ChaosPanel.js'
+import { ReconnectPanel } from './ReconnectPanel.js'
+import { ConnectionPanel } from './ConnectionPanel.js'
+import { DeviceInfoPanel, SignalsPanel } from './DeviceInfoPanel.js'
+import { DeviceConfigPanel } from './DeviceConfigPanel.js'
 import type { ConfigField } from './DeviceConfigPanel.js'
 
 export interface ControlTile {
@@ -158,6 +165,14 @@ function SessionView({ sessionId, onLeave }: { sessionId: string; onLeave: () =>
 	const [tiles, setTiles] = useState<ControlTile[]>([])
 	const [trace, setTrace] = useState<TraceEntry[]>([])
 	const [error, setError] = useState<string | null>(null)
+	const [tab, selectTab] = useTab()
+	// Lines received in total and as of the last look at the Log tab, for its unread count. Counted
+	// separately from `trace`, which is capped and so stops growing.
+	const [traceTotal, setTraceTotal] = useState(0)
+	const [traceSeen, setTraceSeen] = useState(0)
+	useEffect(() => {
+		if (tab === 'log') setTraceSeen(traceTotal)
+	}, [tab, traceTotal])
 
 	useEffect(() => {
 		const subscriptions = [
@@ -177,7 +192,10 @@ function SessionView({ sessionId, onLeave }: { sessionId: string; onLeave: () =>
 				{
 					// Bounded in the UI as well as on the server: a long-running session would otherwise
 					// grow this array without limit in the browser.
-					onData: (entries) => setTrace((current) => [...current, ...(entries as TraceEntry[])].slice(-500)),
+					onData: (entries) => {
+						setTrace((current) => [...current, ...(entries as TraceEntry[])].slice(-500))
+						setTraceTotal((total) => total + (entries as TraceEntry[]).length)
+					},
 					onError: (caught) => setError(caught.message),
 				}
 			),
@@ -199,25 +217,150 @@ function SessionView({ sessionId, onLeave }: { sessionId: string; onLeave: () =>
 
 	return (
 		<div className="session">
-			<header>
-				<div>
-					<strong>{session.device?.productName ?? 'No device'}</strong>
-					<span className={`badge ${session.connected ? 'ok' : 'warn'}`}>
-						{session.connected ? 'connected' : 'offline'}
-					</span>
-					{session.device && <span className="muted">{session.device.id}</span>}
-					{session.apiVersion && <span className="muted">API {session.apiVersion}</span>}
-				</div>
-				<button onClick={onLeave}>Leave</button>
-			</header>
+			<div className="session-top">
+				<header className="session-header">
+					<div className="session-title">
+						<strong>{session.device?.productName ?? 'No device'}</strong>
+						<span className={`badge ${session.connected ? 'ok' : 'warn'}`}>
+							{session.connected ? 'connected' : 'offline'}
+						</span>
+						{session.device && <span className="muted">{session.device.id}</span>}
+						{session.apiVersion && <span className="muted">API {session.apiVersion}</span>}
+					</div>
+					<button className="secondary" onClick={onLeave}>
+						Leave
+					</button>
+				</header>
 
-			<div className="layout">
-				<div className="main">
+				<TabBar tab={tab} onSelect={selectTab} unreadLog={traceTotal - traceSeen} />
+			</div>
+
+			<TabPanel id="surface" tab={tab}>
+				<div className="split">
 					<SurfaceMirror tiles={tiles} gridSize={session.device?.gridSize ?? { rows: 0, columns: 0 }} />
+					<ScenarioPanel session={session} />
+				</div>
+			</TabPanel>
+
+			<TabPanel id="subscriptions" tab={tab}>
+				<div className="narrow">
+					<SubscriptionsPanel sessionId={session.id} />
+				</div>
+			</TabPanel>
+
+			<TabPanel id="log" tab={tab}>
+				<div className="stack">
+					<RawPanel sessionId={session.id} />
 					<TracePanel entries={trace} />
 				</div>
-				<Sidebar session={session} onUnclaimed={onLeave} />
-			</div>
+			</TabPanel>
+
+			<TabPanel id="network" tab={tab}>
+				<div className="cards">
+					<ReconnectPanel sessionId={session.id} connected={session.connected} />
+					<ChaosPanel sessionId={session.id} connected={session.connected} />
+					<VersionPanel />
+					<ConnectionPanel sessionId={session.id} onUnclaimed={onLeave} />
+				</div>
+			</TabPanel>
+
+			<TabPanel id="device" tab={tab}>
+				<div className="cards">
+					<DeviceInfoPanel session={session} />
+					<DeviceConfigPanel
+						sessionId={session.id}
+						fields={session.device?.configFields ?? null}
+						values={session.device?.configValues ?? {}}
+					/>
+					<SignalsPanel session={session} />
+				</div>
+			</TabPanel>
 		</div>
+	)
+}
+
+const TABS = [
+	{ id: 'surface', label: 'Surface' },
+	// Its own tab, not part of Surface: subscriptions watch Companion page locations, not this
+	// surface's controls, and no scenario drives them.
+	{ id: 'subscriptions', label: 'Subscriptions' },
+	{ id: 'log', label: 'Log' },
+	{ id: 'network', label: 'Network' },
+	{ id: 'device', label: 'Device' },
+] as const
+
+type TabId = (typeof TABS)[number]['id']
+
+const tabFromHash = (): TabId => TABS.find((entry) => `#${entry.id}` === location.hash)?.id ?? 'surface'
+
+/** The selected tab, kept in the URL hash so a reload or a shared link lands on the same one. */
+function useTab(): [TabId, (tab: TabId) => void] {
+	const [tab, setTab] = useState<TabId>(tabFromHash)
+
+	useEffect(() => {
+		const onHashChange = () => setTab(tabFromHash())
+		window.addEventListener('hashchange', onHashChange)
+		return () => window.removeEventListener('hashchange', onHashChange)
+	}, [])
+
+	const select = useCallback((next: TabId) => {
+		setTab(next)
+		history.replaceState(null, '', next === 'surface' ? location.pathname + location.search : `#${next}`)
+	}, [])
+
+	return [tab, select]
+}
+
+function TabBar({ tab, onSelect, unreadLog }: { tab: TabId; onSelect: (tab: TabId) => void; unreadLog: number }) {
+	// Arrow keys move between tabs, as the WAI-ARIA tabs pattern expects; Tab moves into the panel.
+	const onKeyDown = (event: React.KeyboardEvent) => {
+		const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+		if (!step) return
+		const index = TABS.findIndex((entry) => entry.id === tab)
+		const next = TABS[(index + step + TABS.length) % TABS.length]!
+		onSelect(next.id)
+		document.getElementById(`tab-${next.id}`)?.focus()
+	}
+
+	return (
+		<nav className="tabs" role="tablist" aria-label="Session" onKeyDown={onKeyDown}>
+			{TABS.map((entry) => (
+				<button
+					key={entry.id}
+					id={`tab-${entry.id}`}
+					role="tab"
+					aria-selected={tab === entry.id}
+					aria-controls={`panel-${entry.id}`}
+					tabIndex={tab === entry.id ? 0 : -1}
+					className="tab"
+					onClick={() => onSelect(entry.id)}
+				>
+					{entry.label}
+					{entry.id === 'log' && unreadLog > 0 && (
+						<span className="count" aria-label={`${unreadLog} new lines`}>
+							{unreadLog > 99 ? '99+' : unreadLog}
+						</span>
+					)}
+				</button>
+			))}
+		</nav>
+	)
+}
+
+/**
+ * Hidden rather than unmounted, so a tab keeps its state — a paused trace, a half-typed raw line —
+ * while another one is open.
+ */
+function TabPanel({ id, tab, children }: { id: TabId; tab: TabId; children: React.ReactNode }) {
+	return (
+		<section
+			id={`panel-${id}`}
+			role="tabpanel"
+			aria-labelledby={`tab-${id}`}
+			hidden={tab !== id}
+			className="tab-panel"
+		>
+			{children}
+		</section>
 	)
 }

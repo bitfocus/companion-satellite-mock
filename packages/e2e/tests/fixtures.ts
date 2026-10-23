@@ -120,3 +120,11 @@ export async function claim(page: Page, stack: Stack): Promise<void> {
 	await page.click('button[type="submit"]')
 	await page.waitForSelector('.grid img')
 }
+
+/** Switch the session view to one of its tabs. Panels on other tabs are hidden, not just scrolled away. */
+export async function openTab(
+	page: Page,
+	name: 'Surface' | 'Subscriptions' | 'Log' | 'Network' | 'Device'
+): Promise<void> {
+	await page.getByRole('tab', { name, exact: false }).click()
+}

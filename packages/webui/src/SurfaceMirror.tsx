@@ -36,6 +36,9 @@ export function SurfaceMirror({
 				style={{
 					gridTemplateColumns: `repeat(${Math.max(1, gridSize.columns)}, minmax(0, 1fr))`,
 					gridTemplateRows: `repeat(${Math.max(1, gridSize.rows)}, minmax(0, 1fr))`,
+					// About the size of a real key: a 4×2 surface stretched across a wide window is
+					// mostly empty space.
+					maxWidth: `${Math.max(1, gridSize.columns) * 8}rem`,
 				}}
 			>
 				{tiles.map((tile) => (

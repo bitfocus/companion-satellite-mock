@@ -1,4 +1,4 @@
-import { claim, expect, test } from './fixtures.js'
+import { claim, expect, openTab, test } from './fixtures.js'
 
 test.describe('claiming', () => {
 	test('shows the connection URL and claims with the code drawn on the surface', async ({ page, stack }) => {
@@ -48,6 +48,7 @@ test.describe('the session view', () => {
 
 	test('shows the device the client actually registered', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Device')
 
 		const device = page.getByTestId('device-panel')
 		await expect(device).toContainText('e2e:surface')
@@ -59,6 +60,7 @@ test.describe('the session view', () => {
 		// The regression that made these tests worth writing. The client pings at 10Hz, so if
 		// keepalives ever reach the trace again they bury everything within seconds.
 		await claim(page, stack)
+		await openTab(page, 'Log')
 
 		const trace = page.getByTestId('trace-panel').locator('.trace li code')
 		await expect(trace.first()).toBeVisible()
@@ -70,6 +72,7 @@ test.describe('the session view', () => {
 
 	test('elides bitmap payloads so the trace stays readable', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Log')
 		const lines = await page.getByTestId('trace-panel').locator('.trace li code').allTextContents()
 		const keyState = lines.find((line) => line.startsWith('KEY-STATE'))
 
@@ -81,6 +84,7 @@ test.describe('the session view', () => {
 
 	test('counts keepalives in the device panel', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Device')
 		const device = page.getByTestId('device-panel')
 		await expect(device).toContainText('in /')
 		await expect(device).toContainText('ago')
@@ -88,6 +92,7 @@ test.describe('the session view', () => {
 
 	test('filters the trace', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Log')
 		await page.fill('input[aria-label="Filter trace"]', 'ADD-DEVICE')
 
 		const lines = await page.getByTestId('trace-panel').locator('.trace li code').allTextContents()
@@ -99,16 +104,16 @@ test.describe('the session view', () => {
 test.describe('scenarios', () => {
 	test('switching redraws the surface with the new content', async ({ page, stack }) => {
 		await claim(page, stack)
-		await page.click('button.scenario:has-text("Companion home")')
+		await page.click('button.scenario:has-text("Colour & text matrix")')
 
-		await expect(page.locator('button.scenario.active')).toContainText('Companion home')
+		await expect(page.locator('button.scenario.active')).toContainText('Colour & text matrix')
 		// Assert on what the client received, not just on the UI's own state.
 		await expect
 			.poll(async () => {
 				const texts = stack.client
 					.messagesOf('KEY-STATE')
 					.map((m) => Buffer.from(String(m.params.TEXT ?? ''), 'base64').toString())
-				return texts.some((text) => text.includes('CAM 1'))
+				return texts.some((text) => text.includes('MiXeD CaSe'))
 			})
 			.toBe(true)
 	})
@@ -117,7 +122,7 @@ test.describe('scenarios', () => {
 		await claim(page, stack)
 		const scenarios = page.locator('button.scenario')
 
-		await expect(scenarios).toHaveCount(10)
+		await expect(scenarios).toHaveCount(9)
 		for (const text of await scenarios.locator('span').allTextContents()) {
 			expect(text.length).toBeGreaterThan(20)
 		}
@@ -127,6 +132,7 @@ test.describe('scenarios', () => {
 test.describe('fault injection', () => {
 	test('applies a knob and the client still works through it', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 
 		const slider = page.getByTestId('chaos-panel').locator('.slider:has-text("Split into frames") input')
 		await slider.fill('16')
@@ -135,6 +141,7 @@ test.describe('fault injection', () => {
 
 		// The real assertion: with lines split across frames, a correct client still parses them.
 		stack.client.clearReceived()
+		await openTab(page, 'Surface')
 		await page.click('button.scenario:has-text("Colour & text matrix")')
 		const states = await stack.client.waitForCount('KEY-STATE', 8, 15_000)
 		expect(states.length).toBeGreaterThanOrEqual(8)
@@ -142,6 +149,7 @@ test.describe('fault injection', () => {
 
 	test('resets every knob', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 		const slider = page.getByTestId('chaos-panel').locator('.slider:has-text("Latency (ms)") input')
 		await slider.fill('500')
 		await slider.dispatchEvent('change')
@@ -153,6 +161,7 @@ test.describe('fault injection', () => {
 
 	test('builds a version URL that selects an older server', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 		const panel = page.getByTestId('version-panel')
 
 		await panel.locator('select').first().selectOption('1.9.0')
@@ -166,6 +175,7 @@ test.describe('fault injection', () => {
 test.describe('connection controls', () => {
 	test('sends a raw line to the client', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Log')
 		stack.client.clearReceived()
 
 		await page.fill('input[aria-label="Raw protocol line"]', 'KEYS-CLEAR DEVICEID=e2e:surface')
@@ -176,6 +186,7 @@ test.describe('connection controls', () => {
 
 	test('refuses a raw line that would corrupt the wire format', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Log')
 		await page.fill('input[aria-label="Raw protocol line"]', 'X TEXT="oops')
 		await page.getByTestId('raw-panel').getByRole('button', { name: 'Send' }).click()
 
@@ -184,6 +195,7 @@ test.describe('connection controls', () => {
 
 	test('force-disconnects the client and reflects it in the UI', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 		const closed = new Promise<void>((resolve) => stack.client.once('close', () => resolve()))
 
 		// No blackout: this test is about the UI noticing the client is gone, not about reconnects.
@@ -195,6 +207,7 @@ test.describe('connection controls', () => {
 
 	test('unclaiming returns to the claim page with a fresh code', async ({ page, stack }) => {
 		await claim(page, stack)
+		await openTab(page, 'Network')
 		await page.getByTestId('connection-panel').getByRole('button', { name: 'Unclaim' }).click()
 
 		await expect(page.getByRole('heading', { name: 'Satellite Mock' })).toBeVisible()
