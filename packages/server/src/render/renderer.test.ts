@@ -33,8 +33,10 @@ describe('canvasToRgb', () => {
 		ctx.fillStyle = 'rgba(255,255,255,0.5)'
 		ctx.fillRect(0, 0, 1, 1)
 
+		// Half of 255, either way it rounds: @napi-rs/canvas 1.0.13 moved from 127 to 128. What the
+		// test pins is premultiplied (about half) against straight (255), not Skia's rounding.
 		const rgb = canvasToRgb(canvas)
-		expect([...rgb]).toEqual([127, 127, 127])
+		for (const channel of rgb) expect([127, 128]).toContain(channel)
 
 		const straight = ctx.getImageData(0, 0, 1, 1).data
 		expect([straight[0], straight[1], straight[2]]).toEqual([255, 255, 255])
