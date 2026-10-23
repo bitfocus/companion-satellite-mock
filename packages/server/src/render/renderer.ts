@@ -2,6 +2,7 @@ import { createCanvas, type Canvas, type SKRSContext2D } from '@napi-rs/canvas'
 import type { BitmapFormat } from '@satellite-mock/protocol'
 import { DEFAULT_BUTTON_STYLE, styleCacheKey, type ButtonStyle } from './buttonStyle.js'
 import { LruCache } from './lru.js'
+import { drawPattern } from './patterns.js'
 
 export type Rotation = 0 | 90 | -90 | 180
 
@@ -117,6 +118,10 @@ export class ButtonRenderer {
 function drawButton(ctx: SKRSContext2D, style: ButtonStyle, width: number, height: number): void {
 	ctx.fillStyle = style.bgColor
 	ctx.fillRect(0, 0, width, height)
+	// A labelled pattern stops above the label strip rather than being drawn underneath it, so two-part
+	// patterns (red text on black then on blue, dark then light levels) keep both parts visible.
+	const labelled = style.pattern && style.pattern !== 'markers' && style.text
+	if (style.pattern) drawPattern(ctx, style.pattern, width, labelled ? height - labelStrip(height) : height)
 
 	if (style.pressed) {
 		ctx.strokeStyle = '#ffffff'
@@ -129,7 +134,31 @@ function drawButton(ctx: SKRSContext2D, style: ButtonStyle, width: number, heigh
 		return
 	}
 
+	if (style.pattern) {
+		// The marker pattern leaves its middle clear for ordinary text; the rest need it out of the way.
+		if (style.text) {
+			if (style.pattern === 'markers') drawText(ctx, style, width, height)
+			else drawLabel(ctx, style, width, height)
+		}
+		return
+	}
+
 	if (style.text) drawText(ctx, style, width, height)
+}
+
+const labelStrip = (height: number) => Math.min(height, Math.max(9, Math.round(height / 5)))
+
+/** A small label in a strip along the bottom edge, for keys whose content is a test pattern. */
+function drawLabel(ctx: SKRSContext2D, style: ButtonStyle, width: number, height: number): void {
+	const strip = labelStrip(height)
+	ctx.fillStyle = '#000000'
+	ctx.fillRect(0, height - strip, width, strip)
+
+	ctx.fillStyle = style.textColor
+	ctx.font = `${strip - 3}px sans-serif`
+	ctx.textAlign = 'center'
+	ctx.textBaseline = 'middle'
+	ctx.fillText(style.text.replace(/\n/g, ' '), width / 2, height - strip / 2, width - 2)
 }
 
 function drawPageGlyph(ctx: SKRSContext2D, style: ButtonStyle, width: number, height: number): void {

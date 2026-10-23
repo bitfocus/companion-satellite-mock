@@ -1,3 +1,5 @@
+import type { TestPattern } from './patterns.js'
+
 /** What a control should look like. The renderer's only input. */
 export interface ButtonStyle {
 	bgColor: string
@@ -9,6 +11,11 @@ export interface ButtonStyle {
 	type: 'BUTTON' | 'PAGEUP' | 'PAGEDOWN' | 'PAGENUM'
 	/** 0-1, drives an LED gauge when the control's style preset asks for one. */
 	gauge?: number
+	/**
+	 * A test pattern drawn over the background. With a pattern, `text` becomes a small label strip
+	 * along the bottom rather than centred text, so it does not cover what is being tested.
+	 */
+	pattern?: TestPattern
 }
 
 export const DEFAULT_BUTTON_STYLE: ButtonStyle = {
@@ -43,6 +50,7 @@ export function styleCacheKey(
 		style.pressed,
 		style.type,
 		style.gauge ?? null,
+		style.pattern ?? null,
 		width,
 		height,
 		format,

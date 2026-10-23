@@ -1,4 +1,5 @@
 import { formatClaimCode } from '../claimCode.js'
+import { PATTERN_LABELS, TEST_PATTERNS } from '../render/patterns.js'
 import type { Scenario, ScenarioContext } from './types.js'
 
 /**
@@ -200,8 +201,9 @@ export const bitmapTortureScenario: Scenario = {
 	id: 'bitmap-torture',
 	name: 'Bitmap torture',
 	description:
-		'Alignment markers, high-contrast edges and per-button numbering, to catch scaling, ' +
-		'orientation and stride bugs in a client decoder.',
+		'A test pattern per key: orientation markers, 1px colour stripes and checkerboards that ' +
+		'chroma subsampling (YUV 4:2:2/4:2:0) visibly destroys, red text, ramps and video-range ' +
+		'levels. Each key is labelled with its row,column and the pattern.',
 	wants: ['bitmaps'],
 
 	init(context) {
@@ -209,12 +211,15 @@ export const bitmapTortureScenario: Scenario = {
 		context.controlIds.forEach((controlId, index) => {
 			const row = columns > 0 ? Math.floor(index / columns) : 0
 			const column = columns > 0 ? index % columns : index
-			// Corner-numbered, alternating background: a transposed or mirrored image is then obvious
-			// at a glance rather than something you have to squint at.
+			const pattern = TEST_PATTERNS[index % TEST_PATTERNS.length]!
+			const coordinate = `${row},${column}`
 			context.draw(controlId, {
+				pattern,
+				// What a colour-and-text surface gets instead: an alternating background still makes a
+				// transposed or mirrored layout obvious, and the label says what the key would show.
 				bgColor: (row + column) % 2 === 0 ? '#ffffff' : '#000000',
-				textColor: (row + column) % 2 === 0 ? '#000000' : '#ffffff',
-				text: `${row},${column}`,
+				textColor: pattern === 'markers' ? '#ffffff' : (row + column) % 2 === 0 ? '#000000' : '#ffffff',
+				text: pattern === 'markers' ? coordinate : `${coordinate} ${PATTERN_LABELS[pattern]}`,
 			})
 		})
 	},

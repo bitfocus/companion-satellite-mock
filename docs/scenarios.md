@@ -8,18 +8,17 @@ client under development may not have implemented bitmaps yet, and that is exact
 most useful — so a bitmap scenario still shows colour and text on a surface without them. The UI
 lists what each scenario wants, and the Device panel shows what your client actually asked for.
 
-| Scenario                 | What it is for                                                                                                                                                                                                                                        |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Unclaimed**            | The default, and what an evaluator sees. Draws the claim code onto the buttons so there is nothing to copy out of the app, plus live buttons proving the surface responds before anyone claims it.                                                    |
-| **Input echo**           | The most useful one during development. Each control shows what the server received _and how it interpreted it_ — the resolved control id, the raw rotation delta and a running total. If your key numbering is off by one, this is where you see it. |
-| **Colour & text matrix** | Text designed to break naive rendering: long strings, multiple lines, accents, RTL, CJK, emoji, and both numeric and `auto` font sizes.                                                                                                               |
-| **Bitmap torture**       | Corner-numbered alternating tiles. A transposed, mirrored or wrongly-strided image is obvious at a glance rather than something you have to squint at.                                                                                                |
-| **Encoder lab**          | Rotation with a value gauge and `LEDS` output. Shows the raw `DIRECTION`, so a 1.14 multi-step rotation can be told apart from a client sending repeated single steps.                                                                                |
-| **Pincode lock**         | Drives `LOCKED-STATE`. The PIN is `1234`. On a client that did not request `PINCODE_LOCK`, it draws lock graphics onto the keys instead, exactly as Companion would.                                                                                  |
-| **Brightness ramp**      | Ramps `BRIGHTNESS` 0–100 and back. A client that opted out with `BRIGHTNESS=0` correctly receives nothing.                                                                                                                                            |
-| **Variables**            | Streams `VARIABLE-VALUE` for each output variable your client declared, and displays whatever it sends back via `SET-VARIABLE-VALUE`.                                                                                                                 |
-| **Attract loop**         | A slow colour sweep for an unattended demo or a screen recording.                                                                                                                                                                                     |
-| **Load sweep**           | The bounded load tool. See below.                                                                                                                                                                                                                     |
+| Scenario                 | What it is for                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Unclaimed**            | The default, and what an evaluator sees. Draws the claim code onto the buttons so there is nothing to copy out of the app. Every key lights up when pressed, proving the surface responds before anyone claims it.                                                                                                                                                                                                                                                                                                                                                                    |
+| **Input echo**           | The most useful one during development. Each control shows what the server received _and how it interpreted it_ — the resolved control id, the raw rotation delta and a running total. If your key numbering is off by one, this is where you see it.                                                                                                                                                                                                                                                                                                                                 |
+| **Colour & text matrix** | Text designed to break naive rendering: long strings, multiple lines, accents, RTL, CJK, emoji, and both numeric and `auto` font sizes.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Bitmap torture**       | A test pattern on every key, labelled with its row,column. Corner markers show a mirrored, rotated or wrongly-strided image. One-pixel red/blue and red/green stripes and checkerboards show chroma subsampling: under YUV 4:2:2 the brightness-matched red/green stripes vanish into flat brown, while the black-and-white stripes beside them survive, so softened colour can be told apart from blur. Also red text on black and on blue, colour edges on odd and even columns, ramps for banding, and near-black/near-white steps that a video-range (16–235) conversion crushes. |
+| **Encoder lab**          | Rotation with a value gauge and `LEDS` output. Shows the raw `DIRECTION`, so a 1.14 multi-step rotation can be told apart from a client sending repeated single steps.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Pincode lock**         | Drives `LOCKED-STATE`. The PIN is `1234`. On a client that did not request `PINCODE_LOCK`, it draws lock graphics onto the keys instead, exactly as Companion would.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Brightness ramp**      | Ramps `BRIGHTNESS` 0–100 and back. A client that opted out with `BRIGHTNESS=0` correctly receives nothing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **Variables**            | Streams `VARIABLE-VALUE` for each output variable your client declared, and displays whatever it sends back via `SET-VARIABLE-VALUE`.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Attract loop**         | A slow colour sweep for an unattended demo or a screen recording.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## A client has to be able to show the code
 
@@ -31,24 +30,17 @@ That is not much of a restriction in practice — a colours-only surface cannot 
 either way — but it is worth knowing while a client is still under development and has not
 implemented text or bitmap rendering yet. Add `TEXT=1` early; it is the cheapest of the three.
 
-The layout adapts to what is available: one character per key on a surface with room to spare, the
-whole code on a single key when there is not, and the optional extras (the server URL, the live
-"press me" button) are dropped before the code is.
+The layout adapts to what is available: one character per key on a surface with room to spare, and
+the whole code on a single key when there is not. Every key lights up while pressed, so the surface
+visibly responds before it is claimed.
 
-## The load tool, and what it does not tell you
+## No load tool
 
-It drives the surface at a capped frame rate for a fixed time, then stops itself.
-
-It is deliberately a **payload sweep rather than a flood**. A flood mostly measures the server and
-the network, and with the render cache warm the server barely notices — the number it produces is
-not about your device at all. What is useful is finding where a _client's_ decode and render
-pipeline stops keeping up, which is a function of payload size and rate.
-
-For that reason it draws unique content on every frame. Repeating content would be served from the
-render cache, and you would be measuring the cache.
-
-Caps: 30fps, 60 seconds, 512 controls. It also passes through the per-session render budget and the
-connection's byte limits like everything else.
+There used to be a load sweep that drove the whole surface with unique content at a chosen frame
+rate. It was removed because it could not measure what it was for. The per-device render budget
+throttles it well below what a decent client can decode, so it found the server's ceiling rather
+than the client's, and the protocol has no acknowledgement for the server to tell what the client
+actually drew. The Attract loop covers "make the surface animate".
 
 ## Two things that are panels rather than scenarios
 
