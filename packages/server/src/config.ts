@@ -58,7 +58,7 @@ export const ConfigSchema = z.object({
 	 * A line may legitimately arrive split across many frames, and many lines may legitimately
 	 * arrive coalesced into one — so tying this to MAX_LINE_BYTES would kill a well-behaved client
 	 * that batches its writes. Its only job is to stop one enormous frame allocating unbounded
-	 * memory before the line buffer ever sees it; the line limit itself is enforced by LineBuffer,
+	 * memory before the line buffer ever sees it; the line limit itself is enforced by the line buffer,
 	 * which is where Companion enforces it too.
 	 */
 	MAX_FRAME_BYTES: positive(1024 * 1024),

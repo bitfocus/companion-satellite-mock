@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events'
 import {
-	normaliseLine,
 	parseLineParameters,
+	SatelliteLineBuffer,
 	serialiseMessage,
-	splitCommand,
+	splitSatelliteCommand,
 	type ParsedParams,
 } from '@satellite-mock/protocol'
 import { WebSocket } from 'ws'
@@ -46,7 +46,8 @@ export class TestSatelliteClient extends EventEmitter<TestClientEvents> {
 	lastCloseCode: number | undefined
 
 	#socket: WebSocket | undefined
-	#buffer = ''
+	// Generous: this is a test client, and the server's own line limit is what is under test.
+	readonly #buffer = new SatelliteLineBuffer(64 * 1024 * 1024)
 	#ping: NodeJS.Timeout | undefined
 	readonly #options: TestClientOptions
 
@@ -88,15 +89,10 @@ export class TestSatelliteClient extends EventEmitter<TestClientEvents> {
 	 * get it right or the tool would look like it was finding server bugs.
 	 */
 	#onData(chunk: string): void {
-		this.#buffer += chunk
-
-		let index: number
-		while ((index = this.#buffer.indexOf('\n')) !== -1) {
-			const line = normaliseLine(this.#buffer.slice(0, index))
-			this.#buffer = this.#buffer.slice(index + 1)
+		for (const line of this.#buffer.push(chunk).lines) {
 			if (line.length === 0) continue
 
-			const { command, body } = splitCommand(line)
+			const { command, body } = splitSatelliteCommand(line)
 			const upper = command.toUpperCase()
 
 			// Answer server pings, or it will drop us.

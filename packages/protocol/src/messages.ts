@@ -1,7 +1,7 @@
 import type { BitmapFormat } from './constants.js'
 import { serialiseMessage, type MessageArgs, type SerialiseOptions } from './serialise.js'
 import type { SatelliteCapabilities } from './versions.js'
-import type { SatelliteControlStylePreset } from './upstream/SatelliteSurfaceManifestSchema.js'
+import type { SatelliteControlStylePreset } from '@companion-app/satellite-protocol/schemas'
 
 /**
  * Builders for every message the server sends.

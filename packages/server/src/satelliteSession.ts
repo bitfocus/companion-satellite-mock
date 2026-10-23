@@ -4,11 +4,11 @@ import {
 	buildPong,
 	capabilitiesFor,
 	ERRORS,
-	normaliseLine,
 	parseLineParameters,
 	serialiseError,
 	serialiseMessage,
-	splitCommand,
+	SatelliteLineBuffer,
+	splitSatelliteCommand,
 	SUPPORTED_API_VERSION,
 	unknownCommandError,
 	type BitmapFormat,
@@ -19,7 +19,6 @@ import type { Config } from './config.js'
 import type { Logger } from './logging.js'
 import { truncate } from './logging.js'
 import { TokenBucket } from './limits.js'
-import { LineBuffer } from './transport/lineBuffer.js'
 import type { SatelliteConnection } from './transport/types.js'
 import type { Device, DeviceRegistry } from './devices.js'
 import type { SatelliteEvents, Subscription } from './events.js'
@@ -81,7 +80,7 @@ export class SatelliteSession {
 
 	readonly #config: Config
 	readonly #logger: Logger
-	readonly #buffer: LineBuffer
+	readonly #buffer: SatelliteLineBuffer
 	readonly #messageBucket: TokenBucket
 	readonly #byteBucket: TokenBucket
 	readonly #handlers: Map<string, CommandHandler>
@@ -99,7 +98,9 @@ export class SatelliteSession {
 		this.#now = options.now ?? Date.now
 		this.capabilities = options.capabilities ?? capabilitiesFor(SUPPORTED_API_VERSION)
 		this.#handlers = options.handlers ?? new Map()
-		this.#buffer = new LineBuffer(options.config.MAX_LINE_BYTES)
+		// Companion's own line splitter: one frame is not one message, a trailing \r is dropped, and
+		// a line over the limit (complete or not) is an overflow.
+		this.#buffer = new SatelliteLineBuffer(options.config.MAX_LINE_BYTES)
 		this.#lastReceivedAt = this.#now()
 
 		this.#messageBucket = new TokenBucket(
@@ -194,9 +195,14 @@ export class SatelliteSession {
 
 		const { lines, overflow } = this.#buffer.push(chunk)
 		for (const line of lines) {
-			const normalised = normaliseLine(line)
-			this.events.onLine?.(this, 'in', normalised)
-			this.#handleLine(normalised)
+			this.events.onLine?.(this, 'in', line)
+			// Contained, as Companion does: a reply that cannot be formatted (a client-supplied value
+			// with a stray \r in it, say) throws, and one bad line must not take the connection down.
+			try {
+				this.#handleLine(line)
+			} catch (error) {
+				this.#logger.error({ err: error, line: truncate(line) }, 'error processing line')
+			}
 			if (this.#closed) return
 		}
 
@@ -209,7 +215,7 @@ export class SatelliteSession {
 	}
 
 	#handleLine(line: string): void {
-		const { command, body } = splitCommand(line)
+		const { command, body } = splitSatelliteCommand(line)
 		const upper = command.toUpperCase()
 
 		// Skip the parse for PING: its payload is the raw remainder, and it is by far the most

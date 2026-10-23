@@ -1,22 +1,26 @@
 /**
- * Constants ported from Companion's satellite service.
+ * Constants for Companion's satellite service.
  *
- * These deliberately mirror upstream rather than picking nicer values — the mock's job is to behave
- * like the real thing. Where the *server* wants tighter limits for abuse resistance, those live in
+ * The protocol's own come from `@companion-app/satellite-protocol`, under the names this package
+ * has always used. The rest mirror upstream rather than picking nicer values — the mock's job is to
+ * behave like the real thing. Where the *server* wants tighter limits for abuse resistance, those live in
  * `@satellite-mock/server`, layered on top of these. See docs/protocol.md §2.
  */
 
-/** The newest API version this package can speak. */
-export const SUPPORTED_API_VERSION = '1.14.0'
-
-/**
- * Upstream's receive-buffer cap, after which the connection is dropped.
- * The server defaults to something much smaller; this is the compatibility value.
- */
-export const UPSTREAM_MAX_LINE_LENGTH = 2 * 1024 * 1024
-
-export const MAX_KEYS_TOTAL = 2000
-export const MAX_KEYS_PER_ROW = 1000
+export {
+	/** The newest API version this package can speak. */
+	API_VERSION as SUPPORTED_API_VERSION,
+	/**
+	 * Upstream's receive-buffer cap, after which the connection is dropped.
+	 * The server defaults to something much smaller; this is the compatibility value.
+	 */
+	MAX_LINE_LENGTH as UPSTREAM_MAX_LINE_LENGTH,
+	MAX_KEYS_TOTAL,
+	MAX_KEYS_PER_ROW,
+	/** Bitmap encodings, in the order upstream advertises them. `rgb` is always the fallback. */
+	SATELLITE_BITMAP_FORMATS as BITMAP_FORMATS,
+	type SatelliteBitmapFormat as BitmapFormat,
+} from '@companion-app/satellite-protocol/constants'
 
 export const LEGACY_MAX_BUTTONS = 32
 export const LEGACY_BUTTONS_PER_ROW = 8
@@ -31,35 +35,6 @@ export const RESERVED_ID_PREFIXES = ['emulator:', 'group:'] as const
 /** Both `SUBID` and advanced-mode control ids use this charset. */
 export const ID_PATTERN = /^[a-zA-Z0-9\-/]+$/
 export const LOCATION_PATTERN = /^(\d+)\/(\d+)\/(\d+)$/
-
-/**
- * Keys dropped during parsing as a prototype-pollution guard.
- *
- * Verbatim from Companion's `BANNED_PROPS`, which lives in the published `@companion-app/expressions`
- * package (v1.0.1, `ExpressionResolve.js`) and reaches the satellite parser via
- * `@companion-app/shared/Expressions.js`. companion-satellite carries the same seven entries in its
- * own copy of the parser.
- *
- * We inline it rather than depending on `@companion-app/expressions`, which would pull acorn,
- * jsonpath-plus, type-fest and unicode-segmenter in for a seven-element Set — this package is meant
- * to stay dependency-light. `bannedProps.test.ts` pins the contents so a divergence is caught.
- *
- * The parsed object is null-prototype anyway, so this is belt and braces — but it is also observable
- * behaviour: a parameter literally named `__lookupGetter__` is silently dropped rather than parsed.
- */
-export const BANNED_PROPS: ReadonlySet<string> = new Set([
-	'__proto__',
-	'constructor',
-	'prototype',
-	'__defineGetter__',
-	'__defineSetter__',
-	'__lookupGetter__',
-	'__lookupSetter__',
-])
-
-/** Bitmap encodings, in the order upstream advertises them. `rgb` is always the fallback. */
-export const BITMAP_FORMATS = ['rgb', 'png', 'webp'] as const
-export type BitmapFormat = (typeof BITMAP_FORMATS)[number]
 
 /**
  * Error strings, verbatim from upstream. Exported as a frozen record so that a typo becomes a

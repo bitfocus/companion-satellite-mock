@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isSafeValue, serialiseError, serialiseMessage } from './serialise.js'
-import { parseLineParameters, splitCommand } from './parse.js'
+import { parseLineParameters, splitSatelliteCommand } from './parse.js'
 
 describe('serialiseMessage', () => {
 	it('quirk 1: emits a trailing space before the newline, as upstream does', () => {
@@ -40,6 +40,19 @@ describe('serialiseMessage', () => {
 		expect(serialiseMessage('X', null, null, { B: 1, A: 2 })).toBe('X B=1 A=2 \n')
 	})
 
+	it('quirk 16: escapes backslashes and quotes in values, as Companion now does', () => {
+		expect(serialiseMessage('X', null, 'a"b', { S: 'c\\d' })).toBe('X DEVICEID="a\\"b" S="c\\\\d" \n')
+		expect({
+			...parseLineParameters(
+				splitSatelliteCommand(serialiseMessage('X', null, null, { S: 'say "hi"' }).trimEnd()).body
+			),
+		}).toEqual({ S: 'say "hi"' })
+	})
+
+	it('refuses a value that cannot be represented on the wire', () => {
+		expect(() => serialiseMessage('X', null, null, { S: 'two\nlines' })).toThrow()
+	})
+
 	it('handles the BEGIN handshake', () => {
 		expect(serialiseMessage('BEGIN', null, null, { CompanionVersion: '5.1.0', ApiVersion: '1.14.0' })).toBe(
 			'BEGIN CompanionVersion="5.1.0" ApiVersion="1.14.0" \n'
@@ -68,7 +81,7 @@ describe('round trip', () => {
 			TEXT: 'SGVsbG8gd29ybGQ=',
 			COLOR: '#00ff00',
 		})
-		const { command, body } = splitCommand(line.trimEnd())
+		const { command, body } = splitSatelliteCommand(line.trimEnd())
 		expect(command).toBe('KEY-STATE')
 		expect({ ...parseLineParameters(body) }).toEqual({
 			DEVICEID: 'streamdeck:12345',
@@ -80,12 +93,8 @@ describe('round trip', () => {
 		})
 	})
 
-	it('quirk 16: a value containing a quote corrupts the line, which is why isSafeValue exists', () => {
-		const line = serialiseMessage('X', null, null, { TEXT: 'a"b c' })
-		const { body } = splitCommand(line.trimEnd())
-		// The quote re-opens quoting, swallowing the space — the value does not survive.
-		expect(parseLineParameters(body).TEXT).not.toBe('a"b c')
-
+	it('refuses raw lines that would end early or leave a quote open', () => {
+		// The raw sender writes operator text straight to the wire, with no formatter to escape it.
 		expect(isSafeValue('a"b')).toBe(false)
 		expect(isSafeValue('a\nb')).toBe(false)
 		expect(isSafeValue('a\rb')).toBe(false)

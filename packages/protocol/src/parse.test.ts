@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
 	isFalsey,
 	isTruthy,
-	normaliseLine,
 	parseLineParameters,
 	parseStringParamWithBooleanFallback,
-	splitCommand,
+	SatelliteLineBuffer,
+	splitSatelliteCommand,
 } from './parse.js'
+
+/*
+ * These test Companion's own codec, re-exported from @companion-app/satellite-protocol. They pin the
+ * quirks docs/protocol.md lists, so a release of that package that changes one fails here rather
+ * than quietly changing what clients see.
+ */
 
 describe('parseLineParameters', () => {
 	it('parses simple key=value pairs', () => {
@@ -85,27 +91,38 @@ describe('parseLineParameters', () => {
 	})
 })
 
-describe('normaliseLine', () => {
-	it('quirk 2: strips only the first carriage return', () => {
-		expect(normaliseLine('A=1\r')).toBe('A=1')
-		expect(normaliseLine('A=\r1\r')).toBe('A=1\r')
+describe('SatelliteLineBuffer', () => {
+	it('quirk 2: strips only a trailing carriage return', () => {
+		const buffer = new SatelliteLineBuffer(1024)
+		expect(buffer.push('A=1\r\nB=\r2\n').lines).toEqual(['A=1', 'B=\r2'])
+	})
+
+	it('splits lines however the data arrives', () => {
+		const buffer = new SatelliteLineBuffer(1024)
+		expect(buffer.push('A=1\nB=').lines).toEqual(['A=1'])
+		expect(buffer.push('2\n').lines).toEqual(['B=2'])
+	})
+
+	it('reports a complete line over the limit, not just an unterminated one', () => {
+		expect(new SatelliteLineBuffer(4).push('ABCDEFG\n').overflow).toBe(true)
+		expect(new SatelliteLineBuffer(4).push('ABCDEFG').overflow).toBe(true)
 	})
 })
 
-describe('splitCommand', () => {
+describe('splitSatelliteCommand', () => {
 	it('splits on the first space', () => {
-		expect(splitCommand('KEY-PRESS DEVICEID=1 KEY=0')).toEqual({
+		expect(splitSatelliteCommand('KEY-PRESS DEVICEID=1 KEY=0')).toEqual({
 			command: 'KEY-PRESS',
 			body: 'DEVICEID=1 KEY=0',
 		})
 	})
 
 	it('handles a command with no arguments', () => {
-		expect(splitCommand('QUIT')).toEqual({ command: 'QUIT', body: '' })
+		expect(splitSatelliteCommand('QUIT')).toEqual({ command: 'QUIT', body: '' })
 	})
 
 	it('quirk 8: leaves a PING payload completely unparsed', () => {
-		expect(splitCommand('PING some "arbitrary" payload=x').body).toBe('some "arbitrary" payload=x')
+		expect(splitSatelliteCommand('PING some "arbitrary" payload=x').body).toBe('some "arbitrary" payload=x')
 	})
 })
 

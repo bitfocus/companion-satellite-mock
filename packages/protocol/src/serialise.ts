@@ -1,4 +1,6 @@
-export type MessageArgs = Record<string, string | number | boolean>
+import { formatSatelliteMessage, type SatelliteMessageArgs } from '@companion-app/satellite-protocol/codec'
+
+export type MessageArgs = SatelliteMessageArgs
 
 export type MessageStatus = 'OK' | 'ERROR'
 
@@ -17,9 +19,10 @@ export interface SerialiseOptions {
 /**
  * Build an outbound Satellite API line, byte-for-byte as Companion would.
  *
- * Values are not escaped, matching upstream: strings are wrapped in quotes and the caller is
- * responsible for not putting a `"` or newline inside one. `assertSafeValue` exists for callers
- * handling untrusted input (the raw sender in the web UI).
+ * Companion's own `formatSatelliteMessage` does the work, so quoting and escaping match exactly:
+ * strings are quoted with `\` and `"` escaped, and a value that cannot be represented (a newline in
+ * it, a key that isn't a plain identifier) throws rather than producing a line that parses back as
+ * something else. The options only apply the chaos tool's two framing variations on top.
  */
 export function serialiseMessage(
 	messageName: string,
@@ -30,27 +33,10 @@ export function serialiseMessage(
 ): string {
 	const { trailingSpace = true, lineEnding = '\n' } = options
 
-	const chunks: string[] = [messageName]
-	if (status) chunks.push(status)
-	if (deviceId) chunks.push(`DEVICEID="${deviceId}"`)
-
-	for (const [key, value] of Object.entries(args)) {
-		let valueStr: string
-		if (typeof value === 'boolean') {
-			valueStr = value ? '1' : '0'
-		} else if (typeof value === 'number') {
-			valueStr = value.toString()
-		} else {
-			valueStr = `"${value}"`
-		}
-		chunks.push(`${key}=${valueStr}`)
-	}
-
-	if (trailingSpace) {
-		chunks.push(lineEnding)
-		return chunks.join(' ')
-	}
-	return chunks.join(' ') + lineEnding
+	let line = formatSatelliteMessage(messageName, status, deviceId, args)
+	if (!trailingSpace) line = line.replace(/ \n$/, '\n')
+	if (lineEnding !== '\n') line = line.replace(/\n$/, lineEnding)
+	return line
 }
 
 /** Build an error response: `NAME ERROR [DEVICEID="…"] MESSAGE="…"`. */
@@ -64,10 +50,10 @@ export function serialiseError(
 }
 
 /**
- * Whether a value can be safely placed in a message without corrupting the line.
+ * Whether a raw line from the web UI can be sent as-is.
  *
- * Upstream does no escaping, so a value containing a quote or a newline produces a line that parses
- * back as something else entirely. Anything accepting operator input must check this first.
+ * The raw sender writes the operator's text straight onto the wire, with no formatter to escape
+ * anything, so it refuses what would end the line early or leave a quote unbalanced.
  */
 export function isSafeValue(value: string): boolean {
 	return !/["\r\n]/.test(value)

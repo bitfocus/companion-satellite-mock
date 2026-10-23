@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SatelliteSurfaceLayoutSchema } from './upstream/SatelliteSurfaceManifestSchema.js'
-import { SatelliteConfigFieldsSchema } from './upstream/SatelliteConfigFieldsSchema.js'
+import { SatelliteSurfaceLayoutSchema } from '@companion-app/satellite-protocol/schemas'
+import { SatelliteConfigFieldsSchema } from '@companion-app/satellite-protocol/schemas'
 
 /**
  * These schemas are copied verbatim from Companion, so these tests are not testing zod — they are a

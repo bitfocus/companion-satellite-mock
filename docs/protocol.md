@@ -31,7 +31,8 @@ Each of these is a test case in `packages/protocol`.
 
 1. **Trailing space before the newline on every emitted line.** `sendMessage` joins its chunks with
    `' '` and pushes `'\n'` as the final chunk, so Companion emits `KEY-STATE DEVICEID="x" KEY=0 \n`.
-2. **Only the first `\r` is stripped** from an inbound line (`line.replace(/\r/, '')`, no `g` flag).
+2. **Only a trailing `\r` is stripped** from an inbound line. A `\r` anywhere else stays in the line.
+   (Changed upstream in 2026: Companion used to strip the first `\r` wherever it was.)
 3. **`=` splits on the first occurrence only** — the remainder is the value. (Fixed upstream in 2026;
    a `split('=', 2)` corrupts base64 padding and `data:` URLs.)
 4. **Quotes are stripped anywhere in a fragment**, not just at the ends: `KEY="1"2` → `12`.
@@ -52,9 +53,10 @@ Each of these is a test case in `packages/protocol`.
 13. **`LEDS` ignores the negotiated `BITMAP_FORMAT`** — always raw RGB, never a data URL.
 14. **`DIRECTION=0` means −1**, not 0.
 15. **Command names are matched case-insensitively** (`cmd.toUpperCase()`); parameter keys are not.
-16. **Outbound values are not escaped.** Companion wraps strings in `"` and relies on callers never
-    putting a `"` or newline into a value. The mock must be equally careful — and its raw sender is
-    where a malformed line would come from.
+16. **Outbound strings are quoted with `\` and `"` escaped**, and a value containing a newline is
+    refused rather than sent. (Changed upstream in 2026: Companion used to send values unescaped.)
+    The raw sender in the web UI writes the operator's text without any escaping, so it refuses
+    quotes and newlines itself.
 17. **`Number('')` is `0`, so `parseKeyParam('')` resolves to key 0.** Latent rather than
     observable: the command handlers reject a falsey `KEY` with `Missing KEY` before reaching the
     parser. Worth knowing before moving that guard.

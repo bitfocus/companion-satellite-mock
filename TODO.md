@@ -15,12 +15,3 @@
   - reordered messages.
 - **`NONSQUARE=0` padding.** When a client doesn't negotiate non-square bitmaps, Companion pads a
   non-square button image to square. The mock renders at the requested size and never pads.
-
-## Protocol package
-
-- **Switch to `@companion-app/satellite-protocol`** for what it now covers: the line parser,
-  message formatter, upstream schemas, constants and feature table. Keep `packages/protocol` as a
-  thin layer for what is mock-specific (outbound message builders, surface model, version
-  profiles, config values). Pin `~0.1.x` while it is pre-1.0, and run its conformance corpus
-  against the server. Once done, the Bitfocus notice in `LICENSE`, `docs/upstream.md` and
-  `docs/shared-package-proposal.md` can go or be cut down.

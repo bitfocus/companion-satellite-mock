@@ -49,8 +49,9 @@ that connection; the Network tab in the web UI builds the URL for you.
 
 ## What it does
 
-- **Speaks the real protocol**, quirks included — the parser is proven equivalent to Companion's by
-  differential testing over 20 000 random lines, and the two schema files are copied verbatim.
+- **Speaks the real protocol**, quirks included — parsing, line splitting, quoting and the schemas
+  are Companion's own code, from
+  [`@companion-app/satellite-protocol`](https://www.npmjs.com/package/@companion-app/satellite-protocol).
 - **Works with no interaction.** A client that connects gets a live, interactive surface. That is
   the zero-interaction path, and it is the default rather than a mode.
 - **Shows you what it sent.** A live mirror of every control rendered from the exact style the
@@ -63,17 +64,17 @@ that connection; the Network tab in the web UI builds the URL for you.
 
 ## Documentation
 
-| Doc                                                                  | Contents                                                                                                                          |
-| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [`docs/scenarios.md`](docs/scenarios.md)                             | What each demo mode is for, and how to add one.                                                                                   |
-| [`docs/security.md`](docs/security.md)                               | Limits, the two structural properties, and what to set before going public.                                                       |
-| [`docs/protocol.md`](docs/protocol.md)                               | Implementation notes complementing the official spec: wire quirks, exact bounds and error strings, the version→capability matrix. |
-| [`docs/sessions.md`](docs/sessions.md)                               | How claiming works, what survives a reconnect, and duplicate device ids.                                                          |
-| [`docs/upstream.md`](docs/upstream.md)                               | What is copied from Companion, what is ported, how to refresh each.                                                               |
-| [`docs/shared-package-proposal.md`](docs/shared-package-proposal.md) | The original proposal for what became `@companion-app/satellite-protocol`.                                                        |
+| Doc                                      | Contents                                                                                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| [`docs/scenarios.md`](docs/scenarios.md) | What each demo mode is for, and how to add one.                                                                                   |
+| [`docs/security.md`](docs/security.md)   | Limits, the two structural properties, and what to set before going public.                                                       |
+| [`docs/protocol.md`](docs/protocol.md)   | Implementation notes complementing the official spec: wire quirks, exact bounds and error strings, the version→capability matrix. |
+| [`docs/sessions.md`](docs/sessions.md)   | How claiming works, what survives a reconnect, and duplicate device ids.                                                          |
+| [`docs/upstream.md`](docs/upstream.md)   | What comes from Companion's `@companion-app/satellite-protocol`, and how to update it.                                            |
 
-`packages/protocol/corpus/satellite-corpus.json` is a language-agnostic conformance corpus. Any
-client, in any language, can run the same cases against its own parser.
+Companion's conformance corpus for the line format ships with `@companion-app/satellite-protocol`
+(`assets/satellite-protocol-corpus.json`). Any client, in any language, can run it against its own
+parser.
 
 ## Layout
 
@@ -124,5 +125,4 @@ come with a test.
 
 ## Licence
 
-MIT. Parts of `packages/protocol` are copied or ported from
-[Bitfocus Companion](https://github.com/bitfocus/companion), also MIT; see [LICENSE](LICENSE).
+MIT; see [LICENSE](LICENSE).

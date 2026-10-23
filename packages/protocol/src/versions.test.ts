@@ -1,4 +1,6 @@
+import { getSatelliteFeatures } from '@companion-app/satellite-protocol/versions'
 import { describe, expect, it } from 'vitest'
+import type { ParsedParams } from './parse.js'
 import {
 	KNOWN_API_VERSIONS,
 	capabilitiesFor,
@@ -136,4 +138,37 @@ describe('parseRotationDelta', () => {
 		expect(parseRotationDelta('right', true)).toBe(1)
 		expect(parseRotationDelta('!', true)).toBe(-1)
 	})
+})
+
+describe("agreement with Companion's feature table", () => {
+	// Every CAPS flag on, so the comparison is purely about which version a feature arrives in.
+	const allEnabled = Object.assign(Object.create(null), {
+		SUBSCRIPTIONS: '1',
+		NONSQUARE: '1',
+		BITMAP_FORMATS: 'rgb,png,webp',
+		ROTARY_AMOUNT: '1',
+	}) as ParsedParams
+
+	it.each(KNOWN_API_VERSIONS.map((entry) => entry.version))(
+		'gates each feature on the same version as Companion at %s',
+		(version) => {
+			const ours = capabilitiesFor(version)
+			const upstream = getSatelliteFeatures(version, ours.sendsCaps ? allEnabled : null)
+			expect({
+				lockState: ours.pincodeLock,
+				surfaceManifest: ours.layoutManifest,
+				deviceSerial: ours.serialParam,
+				caps: ours.sendsCaps,
+				subscriptions: ours.subscriptions,
+				keyStateLocation: ours.keyStateLocation,
+				configFields: ours.configFields,
+				changePage: ours.changePage,
+				firmwareUpdateInfo: ours.firmwareUpdateInfo,
+				nonSquareBitmaps: ours.nonSquare,
+				bitmapFormats: ours.bitmapFormats.length > 1,
+				leds: ours.leds,
+				rotaryAmount: ours.rotaryAmount,
+			}).toEqual(upstream)
+		}
+	)
 })

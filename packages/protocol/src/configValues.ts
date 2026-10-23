@@ -1,4 +1,4 @@
-import type { ConfigField, SatelliteConfigFields } from './upstream/SatelliteConfigFieldsSchema.js'
+import type { ConfigField, SatelliteConfigFields } from '@companion-app/satellite-protocol/schemas'
 
 export type ConfigValue = string | number | boolean
 

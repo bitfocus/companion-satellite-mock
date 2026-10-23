@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { coerceConfigValue, defaultConfigValues, defaultValueFor } from './configValues.js'
-import type { ConfigField } from './upstream/SatelliteConfigFieldsSchema.js'
+import type { ConfigField } from '@companion-app/satellite-protocol/schemas'
 
 const text: ConfigField = { id: 't', label: 'T', type: 'textinput' }
 const number: ConfigField = { id: 'n', label: 'N', type: 'number', min: 5, max: 10 }

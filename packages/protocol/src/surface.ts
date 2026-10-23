@@ -7,7 +7,7 @@ import {
 	MIN_BITMAP_SIZE_PARAM,
 } from './constants.js'
 import { isFalsey, isTruthy, parseStringParamWithBooleanFallback, type ParsedParams } from './parse.js'
-import type { SatelliteControlStylePreset, SatelliteSurfaceLayout } from './upstream/SatelliteSurfaceManifestSchema.js'
+import type { SatelliteControlStylePreset, SatelliteSurfaceLayout } from '@companion-app/satellite-protocol/schemas'
 
 export interface GridSize {
 	rows: number

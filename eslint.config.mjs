@@ -3,15 +3,7 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
 	{
-		// `packages/protocol/src/upstream` is copied verbatim from Companion. Linting it would invite
-		// edits, and the whole value of those files is that a refresh is a clean diff. See docs/upstream.md.
-		ignores: [
-			'**/dist/**',
-			'**/node_modules/**',
-			'**/coverage/**',
-			'.yarn/**',
-			'packages/protocol/src/upstream/**',
-		],
+		ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', '.yarn/**'],
 	},
 	js.configs.recommended,
 	...tseslint.configs.recommended,
