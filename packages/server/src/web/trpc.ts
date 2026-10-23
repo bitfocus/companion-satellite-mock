@@ -46,7 +46,7 @@ const mutation = t.procedure.use(rateLimited)
 /**
  * Require that this browser holds the session.
  *
- * Session contents are explicitly not confidential (see docs/design.md §9), but *acting* on someone
+ * Session contents are explicitly not confidential (see docs/security.md), but *acting* on someone
  * else's session should still need the claim code they were given.
  */
 function requireClaimed(ctx: TrpcContext, sessionId: string) {
@@ -88,7 +88,7 @@ function sessionSnapshot(runtime: MockRuntime, sessionId: string) {
 					variables: device.variables,
 					configFields: device.configFields ?? null,
 					configValues: runtime.configValuesFor(device.id),
-					// Inert text. Displayed, never fetched, never linkified — docs/design.md §9.1.
+					// Inert text. Displayed, never fetched, never linkified — docs/security.md.
 					firmwareUpdateUrl: device.firmwareUpdateUrl,
 					controls: [...device.surface.controls.values()].map((control) => ({
 						id: control.id,

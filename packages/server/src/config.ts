@@ -3,7 +3,7 @@ import { z } from 'zod'
 /**
  * Server configuration, entirely from the environment.
  *
- * Every limit here has a reason in docs/design.md §9.2, and every one is deliberately overridable —
+ * Every limit here has a reason in docs/security.md, and every one is deliberately overridable —
  * the compatibility knobs exist so a client can be tested against Companion's real (much larger)
  * bounds, and the abuse limits exist because this runs unauthenticated on the public internet.
  */
@@ -25,7 +25,7 @@ export const ConfigSchema = z.object({
 	WEB_PORT: port(16624),
 	WEB_BIND: z.string().default('0.0.0.0'),
 
-	/** Prometheus. Bound to loopback by default — see docs/design.md §9.5. */
+	/** Prometheus. Bound to loopback by default — see docs/security.md. */
 	METRICS_PORT: port(16625),
 	METRICS_BIND: z.string().default('127.0.0.1'),
 	METRICS_TOKEN: z.string().min(16).optional(),

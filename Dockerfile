@@ -48,8 +48,8 @@ FROM node:26-alpine AS runtime
 WORKDIR /app
 
 # @napi-rs/canvas ships a musl prebuild, so no toolchain is needed — but it has no fonts of its own,
-# and an image with none renders every label blank. fontconfig + DejaVu is the floor; the renderer
-# registers its own bundled font on top so output is identical across platforms (see design.md §6).
+# and an image with none renders every label blank. fontconfig + DejaVu provide the font every
+# label is drawn in, so rendered text depends on this package being here.
 RUN apk add --no-cache fontconfig font-dejavu tzdata
 
 ENV NODE_ENV=production

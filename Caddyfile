@@ -1,5 +1,5 @@
 # Reference reverse proxy for a public deployment. Caddy terminates TLS and is the only thing
-# exposed; the mock itself never speaks TLS. See docs/design.md §9.5 and docs/security.md.
+# exposed; the mock itself never speaks TLS. See docs/security.md.
 #
 # Two settings in docker-compose.yml must agree with this file:
 #

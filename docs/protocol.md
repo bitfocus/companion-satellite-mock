@@ -42,8 +42,9 @@ Each of these is a test case in `packages/protocol`.
 9. **`Device exists elsewhere` is sent to the _existing_ socket**, not to the one that asked. The
    requesting socket gets no reply at all, and the holder keeps its device — the newcomer does not
    take it over. Verified against upstream `SatelliteApi.ts`, which returns immediately after
-   messaging the holder. This server defaults to a friendlier behaviour here; see docs/design.md
-   §4.4, and use `?duplicates=strict` for upstream's exact silence.
+   messaging the holder. This server defaults to a friendlier behaviour here; see
+   [sessions.md](./sessions.md#a-device-id-that-is-already-in-use), and use `?duplicates=strict` for
+   upstream's exact silence.
 10. **`Line too long` is emitted as `ERROR ERROR MESSAGE="Line too long"`** — `messageName` is
     `'ERROR'` _and_ the status is `'ERROR'`.
 11. **`BITMAPS=1`, any non-numeric truthy value, or a number `<5` all mean 72 px.**
@@ -74,7 +75,7 @@ Each of these is a test case in `packages/protocol`.
 | LED `segments`            | 1 … 200                                                    | schema             |
 | Reserved id prefixes      | `emulator:`, `group:` rejected for `DEVICEID` and `SERIAL` | —                  |
 
-The mock deliberately tightens some of these (see [design.md §9.2](./design.md#92-limits)) with a
+The mock deliberately tightens some of these (see [security.md](./security.md#limits)) with a
 knob to restore upstream values for compatibility testing.
 
 ## 3. Error strings
@@ -158,3 +159,21 @@ Drives `ApiVersionProfile` and the version knob. Companion-version column is fro
 Selecting an API version in the UI must therefore change real behaviour: at 1.6.0 the mock sends no
 `CAPS` at all, no `LOCATION`, no `LEDS`, rejects `ADD-SUB`, streams `rgb` only, and clamps rotation
 to ±1.
+
+## 7. Choosing a bitmap format
+
+**Negotiate `png` or `webp` if your client can decode them, and fall back to `rgb` only if it
+can't.** For one 72×72 button, `rgb` is 15552 bytes on the wire and `png` about 1100. For a 32-key
+surface redrawing every button 30 times a second:
+
+| format | on the wire            | server CPU     |
+| ------ | ---------------------- | -------------- |
+| `rgb`  | 14.9 MB/s (119 Mbit/s) | 2.9% of a core |
+| `png`  | 1.1 MB/s (8.7 Mbit/s)  | 39% of a core  |
+
+PNG costs the server more to encode, but it saves over 100 Mbit/s per surface, and that cost is the
+cacheable side: identical buttons encode nothing at all, while the bytes go out every time. `rgb` at
+that rate rules out anything but a LAN. Measure it yourself with `node scripts/bench-render.mjs`.
+
+`rgb` is the image composited onto black, with no alpha channel. `png` and `webp` keep the alpha
+channel; the mock's buttons are always fully opaque.

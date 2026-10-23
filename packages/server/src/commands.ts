@@ -337,7 +337,7 @@ const firmwareUpdateInfo: CommandHandler = (context) => {
 
 	// Stored as inert text and surfaced in the web UI. Never fetched, never linkified — this is the
 	// only user-supplied URL the protocol carries, and the no-egress invariant depends on it staying
-	// data. See docs/design.md §9.1.
+	// data. See docs/security.md.
 	device.firmwareUpdateUrl = url === '' ? null : url
 	context.session.events.onFirmwareUpdateInfo?.(context.session, device, device.firmwareUpdateUrl)
 	ok(context.session, messageName, device.id)

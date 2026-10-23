@@ -5,9 +5,6 @@ confidentiality — session contents are explicitly not secret — but **availab
 one bored visitor can do to everyone else's demo, and whether the server is useful to someone as a
 tool for reaching a third party.
 
-Full reasoning is in [design.md §9](./design.md#9-security-and-abuse-resistance). This is the
-operator's summary.
-
 ## The two structural properties
 
 **No user-controlled egress.** The server never fetches a URL, resolves a hostname, or opens an
@@ -70,6 +67,20 @@ routed IPv6 prefix is not a way to walk straight back in.
 The inbound rate limits are tuned against the **reference client, which pings at 10 Hz** — not
 against the spec's suggested 2 s interval, which would throttle every real client. There is a test
 asserting a 10 Hz client is not throttled.
+
+## Web layer
+
+- Two WebSocket paths with different guards. `/ws/satellite` is for native clients and checks no
+  `Origin`, because they send none. `/ws/trpc` is for the browser and only accepts the configured
+  `PUBLIC_ORIGIN`. They are separate listeners on separate ports, so one set of guards can't be
+  wrong for the other.
+- A strict CSP plus `nosniff`, `no-referrer` and frame-denial headers. No CORS, no cookies and no
+  uploads. The browser's id lives in `localStorage` and only scopes sessions; it authorises nothing.
+- Every tRPC input is validated with zod, and mutations are rate limited per IP — never per browser
+  id, because the browser chooses it.
+- The parser builds prototype-less objects and drops prototype keys; base64 is size-checked before
+  decoding; JSON is parsed under a size cap and then schema-validated. Nothing evaluates input or
+  builds a file path from it.
 
 ## Metrics
 

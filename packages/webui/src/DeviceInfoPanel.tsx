@@ -60,7 +60,7 @@ export function SignalsPanel({ session }: { session: SessionSnapshot }) {
 				<dt>Firmware update URL</dt>
 				<dd>
 					{session.device?.firmwareUpdateUrl ? (
-						/* Deliberately inert text, never a link and never fetched — docs/design.md §9.1. */
+						/* Deliberately inert text, never a link and never fetched — docs/security.md. */
 						<code className="inert">{session.device.firmwareUpdateUrl}</code>
 					) : (
 						<span className="muted">none reported</span>

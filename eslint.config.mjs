@@ -40,7 +40,7 @@ export default tseslint.config(
 	},
 	{
 		// The protocol package must stay pure: no I/O, so that it can be unit tested in isolation and
-		// diffed against upstream. See docs/design.md §5.1.
+		// diffed against upstream. See packages/protocol/src/index.ts.
 		//
 		// Tests are exempt: they are excluded from the build by the package's tsconfig, so they are
 		// not part of the shipped artifact, and the conformance corpus has to be read from disk.
@@ -54,7 +54,7 @@ export default tseslint.config(
 					patterns: [
 						{
 							group: ['node:net', 'node:http', 'node:https', 'node:fs', 'ws', 'express'],
-							message: 'packages/protocol must stay free of I/O — see docs/design.md §5.1',
+							message: 'packages/protocol must stay free of I/O — see packages/protocol/src/index.ts',
 						},
 					],
 				},
@@ -63,7 +63,7 @@ export default tseslint.config(
 	},
 	{
 		// No user-controlled egress anywhere in the server: the mock must never fetch a URL supplied
-		// over the protocol (notably FIRMWARE-UPDATE-INFO's UPDATE_URL). See docs/design.md §9.1.
+		// over the protocol (notably FIRMWARE-UPDATE-INFO's UPDATE_URL). See docs/security.md.
 		//
 		// Tests are exempt on the same grounds as the protocol package's rule: they are excluded from
 		// the build, so they are not part of the shipped artifact, and they legitimately need to make
@@ -73,7 +73,7 @@ export default tseslint.config(
 		rules: {
 			'no-restricted-globals': [
 				'error',
-				{ name: 'fetch', message: 'the server must make no outbound requests — see docs/design.md §9.1' },
+				{ name: 'fetch', message: 'the server must make no outbound requests — see docs/security.md' },
 			],
 			// `node:http` itself is allowed — it is needed to create the server that express and the
 			// WebSocket upgrade handler share. What is banned is anything that makes an outbound request.
@@ -83,17 +83,17 @@ export default tseslint.config(
 					paths: [
 						{
 							name: 'axios',
-							message: 'the server must make no outbound requests — see docs/design.md §9.1',
+							message: 'the server must make no outbound requests — see docs/security.md',
 						},
 						{
 							name: 'node-fetch',
-							message: 'the server must make no outbound requests — see docs/design.md §9.1',
+							message: 'the server must make no outbound requests — see docs/security.md',
 						},
 						{
 							name: 'undici',
-							message: 'the server must make no outbound requests — see docs/design.md §9.1',
+							message: 'the server must make no outbound requests — see docs/security.md',
 						},
-						{ name: 'got', message: 'the server must make no outbound requests — see docs/design.md §9.1' },
+						{ name: 'got', message: 'the server must make no outbound requests — see docs/security.md' },
 					],
 				},
 			],

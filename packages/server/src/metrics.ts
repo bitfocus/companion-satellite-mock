@@ -12,7 +12,7 @@ import type { SatelliteServer } from './satelliteServer.js'
  * Two independent defences, because one mistyped proxy rule should not expose operational internals:
  * the listener binds to loopback by default and the reverse proxy has no route to it at all, and an
  * optional bearer token gates it as well. An unauthenticated request answers **404**, not 401, so a
- * prober cannot confirm the endpoint exists. See docs/design.md §9.5.
+ * prober cannot confirm the endpoint exists. See docs/security.md.
  */
 export class MetricsServer {
 	readonly registry = new Registry()

@@ -11,7 +11,7 @@ services:
     cpus: 1.5
     environment:
       # Number of trusted reverse-proxy hops. Must match the deployment, or X-Forwarded-For can be
-      # spoofed by clients — see docs/design.md §9.3.
+      # spoofed by clients — see "Trusted proxies" in docs/security.md.
       TRUSTED_PROXY_HOPS: 1
       PUBLIC_ORIGIN: https://satellite-mock.companion.free
       # Metrics listen on their own port, bound to all interfaces *within the compose network* so a

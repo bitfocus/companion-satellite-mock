@@ -6,7 +6,7 @@ import type { SatelliteConnection } from './transport/types.js'
  *
  * Every knob has a hard ceiling, and every one is scoped to a single claimed session — a tool that
  * can be pointed at someone else's connection, or turned up without limit, is an amplifier rather
- * than a test tool. See docs/design.md §8.3.
+ * than a test tool.
  */
 export const ChaosConfigSchema = z.object({
 	/** Fixed delay added to every outbound line. */

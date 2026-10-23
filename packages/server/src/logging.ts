@@ -7,7 +7,7 @@ export type { Logger }
 export function createLogger(config: Config): Logger {
 	return pino({
 		level: config.LOG_LEVEL,
-		// Payloads are truncated and bitmaps never logged — see docs/design.md §9.5.
+		// Payloads are truncated and bitmaps never logged — see docs/security.md.
 		redact: { paths: ['bitmap', '*.bitmap', 'BITMAP', '*.BITMAP'], censor: '[bitmap]' },
 		...(config.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty' } } : {}),
 	})

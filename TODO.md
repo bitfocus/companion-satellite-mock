@@ -45,9 +45,5 @@
 ## Small fixes
 
 - The raw line placeholder `KEYS-CLEAR DEVICEID="dev1"` contains quotes, which the server refuses.
-- Dockerfile comment claims the renderer registers a bundled font; it doesn't, so output depends on
-  the image's DejaVu fonts. Either bundle a font or fix the comment.
 - Comments in `render/budget.ts` repeat the disproven claim that PNG encoding blocks the event loop.
 - `TracePanel.tsx` says keepalives are shown "in the sidebar"; they're on the Device tab.
-- `docker-compose.yml` points to design.md §9.3 for `TRUSTED_PROXY_HOPS`; the explanation is in
-  docs/security.md.

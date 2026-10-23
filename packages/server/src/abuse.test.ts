@@ -9,7 +9,7 @@ import { appRouter, type TrpcContext } from './web/trpc.js'
 /**
  * Abuse simulation.
  *
- * Everything here is a limit from docs/design.md §9.2, driven until it bites. A limit nobody has
+ * Everything here is a limit from docs/security.md, driven until it bites. A limit nobody has
  * ever seen fire is a limit nobody should trust, and on a public unauthenticated server these are
  * the only thing standing between one bored visitor and everyone else's demo.
  */

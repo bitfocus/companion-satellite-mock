@@ -165,7 +165,7 @@ export class MockRuntime {
 			// state and then a real one, and only worked when that layer happened to be wired up.
 			resolveSubscriptionContent: (subscription) => this.pages.get(locationKey(subscription)),
 			onFirmwareUpdateInfo: (_c, device, url) => {
-				// Recorded for the web UI only. Never fetched — see docs/design.md §9.1.
+				// Recorded for the web UI only. Never fetched — see docs/security.md.
 				this.#logger.info({ device: device.id, hasUrl: url !== null }, 'firmware update info reported')
 			},
 		}

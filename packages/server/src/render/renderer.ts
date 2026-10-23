@@ -21,8 +21,8 @@ export interface RendererOptions {
 /**
  * Renders button images.
  *
- * The alpha handling here is the part to be careful with, and it has bitten Companion. See
- * docs/design.md §6 for the measurements; the short version:
+ * The alpha handling here is the part to be careful with, and it has bitten Companion. For the
+ * speed side, see scripts/bench-render.mjs and docs/protocol.md §7. The rules:
  *
  * - `canvas.data()` returns PREMULTIPLIED rgba. Dropping the alpha channel from it composites onto
  *   black, which is exactly what the `rgb` wire format is — Companion's `transformButtonImage` sets

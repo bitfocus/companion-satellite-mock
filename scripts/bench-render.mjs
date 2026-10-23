@@ -2,10 +2,8 @@
 /**
  * Rendering benchmark.
  *
- * This exists because a conclusion in docs/design.md §6 went stale and contradicted the table
- * printed directly above it: the rgb path was optimised, PNG was never re-compared against the
- * faster path, and the doc kept recommending PNG as the cheaper option. A measurement that cannot
- * be re-run is a measurement that will eventually be wrong, so it lives here and the doc quotes it.
+ * The numbers behind the bitmap format advice in docs/protocol.md §7. A measurement that cannot be
+ * re-run will eventually be wrong, so it lives here rather than only in prose.
  *
  * Usage: node scripts/bench-render.mjs
  *

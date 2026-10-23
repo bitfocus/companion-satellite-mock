@@ -11,7 +11,7 @@ import type { Surface } from '@satellite-mock/protocol'
  *
  * It is deliberately self-documenting about the divergence: the screen names the real behaviour and
  * how to get it, so the friendlier default teaches Companion's rule rather than hiding it. See
- * docs/design.md §4.4.
+ * docs/sessions.md.
  */
 
 /** Drawn in priority order; a surface with few keys still shows the first, most important ones. */

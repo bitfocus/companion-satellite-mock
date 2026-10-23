@@ -31,7 +31,7 @@ export interface SatelliteServerOptions {
  *
  * Note there is no Origin check here, and that is deliberate: native satellite clients are not
  * browsers and send no Origin header, so requiring one would break every real client. The web UI's
- * socket is a separate listener on a separate port, and that one does check. See docs/design.md §9.3.
+ * socket is a separate listener on a separate port, and that one does check. See docs/security.md.
  */
 export class SatelliteServer {
 	readonly #config: Config

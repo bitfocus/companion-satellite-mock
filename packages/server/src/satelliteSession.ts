@@ -42,7 +42,7 @@ export interface CommandContext {
  * that asked gets no reply whatsoever. `friendly` is this server being more helpful than the real
  * thing — it accepts the registration and draws the reason onto the surface, because otherwise the
  * newcomer is in a dead end it cannot see or escape: it never gets a claim code, so it cannot even
- * reach the web UI to find out why. See docs/design.md §4.4.
+ * reach the web UI to find out why. See docs/sessions.md.
  */
 export type DuplicatePolicy = 'friendly' | 'strict'
 
