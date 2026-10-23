@@ -52,7 +52,6 @@ Or `docker compose up`, which also brings up Caddy for TLS.
 | [`docs/security.md`](docs/security.md)                               | Limits, the two structural properties, and what to set before going public.                                                       |
 | [`docs/protocol.md`](docs/protocol.md)                               | Implementation notes complementing the official spec: wire quirks, exact bounds and error strings, the version→capability matrix. |
 | [`docs/design.md`](docs/design.md)                                   | System design and the reasoning behind it.                                                                                        |
-| [`docs/implementation-plan.md`](docs/implementation-plan.md)         | Build order, with what each phase actually produced.                                                                              |
 | [`docs/upstream.md`](docs/upstream.md)                               | What is copied from Companion, what is ported, how to refresh each.                                                               |
 | [`docs/shared-package-proposal.md`](docs/shared-package-proposal.md) | Proposal for extracting a shared `@companion-app/satellite-protocol`.                                                             |
 
