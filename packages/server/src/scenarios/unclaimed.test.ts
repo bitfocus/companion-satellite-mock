@@ -22,7 +22,7 @@ import type { SatelliteConnection } from '../transport/types.js'
 const logger = pino({ level: 'silent' })
 const CODE = 'K7M2QP'
 
-function renderOn(keysTotal: number, keysPerRow: number): { texts: string[]; sent: string[] } {
+function renderOn(keysTotal: number, keysPerRow: number) {
 	const sent: string[] = []
 	const connection = {
 		id: 'c',
@@ -68,7 +68,8 @@ function renderOn(keysTotal: number, keysPerRow: number): { texts: string[]; sen
 		budget: new RenderBudget(1_000_000_000),
 	})
 
-	new ScenarioEngine(logger).attach(device, emitter, unclaimedScenario(CODE))
+	const engine = new ScenarioEngine(logger)
+	engine.attach(device, emitter, unclaimedScenario(CODE))
 	emitter.flush()
 
 	const texts = sent
@@ -76,7 +77,7 @@ function renderOn(keysTotal: number, keysPerRow: number): { texts: string[]; sen
 		.filter((value): value is string => value !== undefined)
 		.map((value) => Buffer.from(value, 'base64').toString())
 
-	return { texts, sent }
+	return { texts, sent, engine, emitter, controlIds: [...device.surface.controls.keys()] }
 }
 
 /** The code as a reader would assemble it: single-character keys in order. */
@@ -128,5 +129,18 @@ describe('the Unclaimed screen', () => {
 
 	it('still works on a single-key surface', () => {
 		expect(() => renderOn(1, 1)).not.toThrow()
+	})
+
+	it('puts a code key back as it was after a press, and ignores rotation on it', () => {
+		const { engine, emitter, controlIds } = renderOn(8, 4)
+		const key = controlIds.find((id) => emitter.styleOf(id).text === 'K')!
+		const before = emitter.styleOf(key)
+
+		engine.press('dev1', key, true)
+		expect(emitter.styleOf(key).bgColor).not.toBe(before.bgColor)
+		engine.press('dev1', key, false)
+		engine.rotate('dev1', key, 3)
+
+		expect(emitter.styleOf(key)).toMatchObject({ text: 'K', bgColor: before.bgColor, pressed: false })
 	})
 })

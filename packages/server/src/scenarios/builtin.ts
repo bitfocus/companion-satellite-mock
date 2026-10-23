@@ -24,8 +24,22 @@ function paint(context: ScenarioContext, index: number, style: Parameters<Scenar
 // 1. Unclaimed — the default, and the one an evaluator sees.
 // ---------------------------------------------------------------------------------------------
 
+const UNCLAIMED_IDLE = '#101014'
+
 export function unclaimedScenario(claimCode: string): Scenario {
 	const formatted = formatClaimCode(claimCode)
+
+	/**
+	 * Paint a key that carries part of the screen, remembering its colour so a press can restore it.
+	 * Its text is never touched again: an encoder sitting on a code key must not turn a code
+	 * character into a rotation count.
+	 */
+	const paintFixed = (context: ScenarioContext, index: number, style: Parameters<ScenarioContext['draw']>[1]) => {
+		const id = at(context, index)
+		if (!id) return
+		context.state.set(`fixed:${id}`, style.bgColor)
+		context.draw(id, style)
+	}
 
 	return {
 		id: 'unclaimed',
@@ -36,7 +50,7 @@ export function unclaimedScenario(claimCode: string): Scenario {
 		wants: ['colors', 'text'],
 
 		init(context) {
-			context.drawAll({ bgColor: '#101014', textColor: '#ffffff', text: '' })
+			context.drawAll({ bgColor: UNCLAIMED_IDLE, textColor: '#ffffff', text: '' })
 
 			// The header takes the first key and the code the ones after it; everything else stays the
 			// idle background. The code is the one thing that must always fit, so it is laid out last of
@@ -50,7 +64,7 @@ export function unclaimedScenario(claimCode: string): Scenario {
 
 			const header = take()
 			if (header !== undefined) {
-				paint(context, header, { bgColor: '#8a2be2', text: 'UN-\nCLAIMED', textColor: '#ffffff' })
+				paintFixed(context, header, { bgColor: '#8a2be2', text: 'UN-\nCLAIMED', textColor: '#ffffff' })
 			}
 
 			// One character per key when there is room for all of them, otherwise the whole code on a
@@ -59,7 +73,7 @@ export function unclaimedScenario(claimCode: string): Scenario {
 				for (const character of claimCode) {
 					const slot = take()
 					if (slot === undefined) break
-					paint(context, slot, {
+					paintFixed(context, slot, {
 						bgColor: '#1e3a5f',
 						textColor: '#ffffff',
 						text: character,
@@ -69,17 +83,20 @@ export function unclaimedScenario(claimCode: string): Scenario {
 			} else {
 				const slot = take()
 				if (slot !== undefined) {
-					paint(context, slot, { bgColor: '#1e3a5f', text: formatted, textColor: '#ffffff' })
+					paintFixed(context, slot, { bgColor: '#1e3a5f', text: formatted, textColor: '#ffffff' })
 				}
 			}
 		},
 
 		onPress(context, controlId, pressed) {
-			// Any key lights up when pressed, so the surface visibly responds before it is claimed.
-			context.draw(controlId, { pressed, bgColor: pressed ? '#00b0b0' : '#005f5f' })
+			// Any key lights up while pressed, so the surface visibly responds before it is claimed, and
+			// goes back to what it was on release.
+			const base = (context.state.get(`fixed:${controlId}`) as string | undefined) ?? UNCLAIMED_IDLE
+			context.draw(controlId, { pressed, bgColor: pressed ? '#00b0b0' : base })
 		},
 
 		onRotate(context, controlId, delta) {
+			if (context.state.has(`fixed:${controlId}`)) return
 			const key = `rot:${controlId}`
 			const value = ((context.state.get(key) as number) ?? 0) + delta
 			context.state.set(key, value)
