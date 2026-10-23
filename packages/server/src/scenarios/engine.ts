@@ -23,8 +23,13 @@ export class ScenarioEngine {
 	readonly #now: () => number
 	#timer: NodeJS.Timeout | undefined
 
-	/** How often the shared timer wakes. The floor on any scenario's effective tick rate. */
-	static readonly TICK_RESOLUTION_MS = 50
+	/**
+	 * How often the shared timer wakes. The floor on any scenario's effective tick rate, and the
+	 * granularity of its timing: at 50ms the load sweep could never pass 20fps, and a frame due at
+	 * 100ms that the timer reached at 99 waited until 150. One wakeup every 10ms that mostly finds
+	 * nothing due is still a single timer, which is the point of sharing it.
+	 */
+	static readonly TICK_RESOLUTION_MS = 10
 
 	constructor(logger: Logger, now: () => number = Date.now) {
 		this.#logger = logger.child({ component: 'scenarios' })
@@ -87,7 +92,10 @@ export class ScenarioEngine {
 			const elapsed = now - running.lastTickAt
 			if (elapsed < tickMs) continue
 
-			running.lastTickAt = now
+			// Advance by the period rather than to `now`, so ticks keep their rate instead of drifting
+			// late by up to one resolution step each time. After a long stall, resync rather than
+			// firing a burst of catch-up ticks.
+			running.lastTickAt = elapsed < tickMs * 2 ? running.lastTickAt + tickMs : now
 			this.#guard(running, 'tick', () => running.scenario.tick?.(running.context, elapsed))
 		}
 	}

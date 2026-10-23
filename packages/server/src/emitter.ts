@@ -44,6 +44,11 @@ export interface EmitterOptions {
  * - **Backpressure.** If the socket cannot keep up, the queue is dropped and the connection closed
  *   rather than buffering without limit. A public server cannot let one slow client consume memory
  *   indefinitely.
+ * - **Whole frames.** Everything pending at a flush is paid for from the render budget in one go,
+ *   and either all of it is sent or none of it is. Paying key by key meant an over-budget scenario
+ *   sent the first keys in surface order and deferred the rest, so the surface tore into a rolling
+ *   wave and the last row lost nearly every frame to coalescing. Now a frame that does not fit
+ *   waits, and is superseded whole by the next one if that arrives first.
  */
 export class SurfaceEmitter {
 	readonly #device: Device
@@ -58,6 +63,13 @@ export class SurfaceEmitter {
 
 	/** Current style per control, so a partial update can be merged onto what is already shown. */
 	readonly #styles = new Map<string, ButtonStyle>()
+	/**
+	 * The style each control was last actually sent with. Differs from #styles whenever a frame is
+	 * waiting on the budget or was superseded before it went out, which is exactly what the web UI's
+	 * mirror has to show: mirroring #styles made an over-budget animation look smooth in the browser
+	 * while the device was skipping frames.
+	 */
+	readonly #sentStyles = new Map<string, ButtonStyle>()
 	/** Controls awaiting a flush. A Set, because the style itself lives in #styles — latest wins. */
 	readonly #pending = new Set<string>()
 	#flushScheduled = false
@@ -93,6 +105,11 @@ export class SurfaceEmitter {
 		return this.#styles.get(controlId) ?? DEFAULT_BUTTON_STYLE
 	}
 
+	/** What the device was last sent for this control, which may lag `styleOf`. */
+	sentStyleOf(controlId: string): ButtonStyle {
+		return this.#sentStyles.get(controlId) ?? DEFAULT_BUTTON_STYLE
+	}
+
 	/** Queue a control for redraw, merging onto its current style. */
 	draw(controlId: string, style: Partial<ButtonStyle>): void {
 		if (!this.#device.surface.controls.has(controlId)) return
@@ -121,6 +138,21 @@ export class SurfaceEmitter {
 		}
 
 		const pending = [...this.#pending]
+
+		let pixels = 0
+		for (const controlId of pending) {
+			const bitmap = this.#device.surface.controls.get(controlId)?.style.bitmap
+			if (bitmap && this.#budget.canEverAfford(bitmap.w, bitmap.h)) pixels += bitmap.w * bitmap.h
+		}
+		// Paid up front for the whole frame. A frame bigger than the entire budget can never be paid
+		// for at once, so that falls back to paying per key; with the burst sized to the surface it
+		// only happens when one flush holds more than a whole surface's worth, which it cannot.
+		const prepaid = pixels > 0 && this.#budget.canEverAffordPixels(pixels)
+		if (prepaid && !this.#budget.tryConsumePixels(pixels)) {
+			this.#scheduleRetry()
+			return
+		}
+
 		this.#pending.clear()
 
 		let deferred = false
@@ -129,7 +161,7 @@ export class SurfaceEmitter {
 			if (!control) continue
 
 			const style = this.styleOf(controlId)
-			const args = this.#buildArgs(controlId, style)
+			const args = this.#buildArgs(controlId, style, prepaid)
 			if (!args) continue
 
 			if (args.bitmapDeferred) {
@@ -152,13 +184,14 @@ export class SurfaceEmitter {
 					caps: this.#capabilities,
 				})
 			)
+			this.#sentStyles.set(controlId, style)
 			this.#sent++
 		}
 
 		if (deferred) this.#scheduleRetry()
 	}
 
-	#buildArgs(controlId: string, style: ButtonStyle) {
+	#buildArgs(controlId: string, style: ButtonStyle, prepaid: boolean) {
 		const control = this.#device.surface.controls.get(controlId)
 		if (!control) return undefined
 
@@ -170,14 +203,15 @@ export class SurfaceEmitter {
 
 		let bitmapDeferred = false
 		if (preset.bitmap) {
-			if (this.#budget.tryConsume(preset.bitmap.w, preset.bitmap.h)) {
+			const affordable = this.#budget.canEverAfford(preset.bitmap.w, preset.bitmap.h)
+			if ((prepaid && affordable) || (!prepaid && this.#budget.tryConsume(preset.bitmap.w, preset.bitmap.h))) {
 				values.bitmap = this.#renderer.render(style, {
 					width: preset.bitmap.w,
 					height: preset.bitmap.h,
 					format: this.#device.bitmapFormat,
 					rotation: this.#rotation,
 				})
-			} else if (this.#budget.canEverAfford(preset.bitmap.w, preset.bitmap.h)) {
+			} else if (affordable) {
 				// Momentarily over budget, but the bucket will refill enough to hold this frame. Defer
 				// the whole key and retry rather than sending it now without a bitmap: on a bitmap-only
 				// surface a bitmap-less KEY-STATE paints nothing, so the key would sit blank until
@@ -227,6 +261,7 @@ export class SurfaceEmitter {
 	clearKeys(): void {
 		this.#pending.clear()
 		this.#styles.clear()
+		this.#sentStyles.clear()
 		if (this.#retryTimer) {
 			clearTimeout(this.#retryTimer)
 			this.#retryTimer = undefined

@@ -135,4 +135,26 @@ describe('stress scenario', () => {
 			vi.useRealTimers()
 		}
 	})
+
+	it.each([10, 25, 30])('delivers the requested %i fps, evenly, on the engine resolution', (fps) => {
+		// At the old 50ms engine resolution 30fps was impossible, and "at least 1/fps since the last
+		// frame" lost a whole tick whenever the timer came in a millisecond early.
+		vi.useFakeTimers()
+		try {
+			const { engine, device, emitter } = harness()
+			engine.attach(device, emitter, stressScenario, { fps, durationSec: 10 })
+
+			for (let elapsed = 0; elapsed < 2000; elapsed += ScenarioEngine.TICK_RESOLUTION_MS) {
+				// Real timers wobble; alternate a millisecond early and late.
+				vi.advanceTimersByTime(ScenarioEngine.TICK_RESOLUTION_MS + (elapsed % 20 === 0 ? -1 : 1))
+				engine.tickAll()
+			}
+
+			const frames = engine.get('dev1')!.context.state.get('frames') as number
+			expect(frames).toBeGreaterThanOrEqual(fps * 2 - 1)
+			expect(frames).toBeLessThanOrEqual(fps * 2 + 1)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
 })

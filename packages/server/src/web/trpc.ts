@@ -115,7 +115,8 @@ function surfaceSnapshot(runtime: MockRuntime, deviceId: string) {
 	if (!deviceRuntime) return []
 
 	return [...deviceRuntime.device.surface.controls.values()].map((control) => {
-		const style = deviceRuntime.emitter.styleOf(control.id)
+		// What was sent, not what the scenario last asked for: they differ when frames are throttled.
+		const style = deviceRuntime.emitter.sentStyleOf(control.id)
 		// Always a PNG for the UI regardless of what the device negotiated: the browser has a decoder
 		// and raw rgb would mean shipping 15KB per tile and decoding it in JavaScript.
 		const preview = runtime.renderer.render(style, {

@@ -206,6 +206,68 @@ describe('SurfaceEmitter', () => {
 		expect(emitter.stats.pending).toBe(0)
 	})
 
+	it('sends an over-budget animation as whole frames, so no row is starved', () => {
+		// The bug this guards: paying key by key sent the first keys of each frame and deferred the
+		// rest, so the surface tore into a rolling wave and the last row lost almost every frame to
+		// coalescing. Now each flush sends every pending key or none of them.
+		let now = 0
+		const connection = fakeConnection()
+		const device = makeDevice('KEYS_TOTAL=4 KEYS_PER_ROW=2 BITMAPS=64', { connection })
+		const emitter = new SurfaceEmitter({
+			device,
+			connection,
+			capabilities: caps,
+			// Burst holds one whole frame; the rate affords about half of one per 100ms frame.
+			budget: new RenderBudget(80_000, 4 * 4096, () => now),
+			renderer: new ButtonRenderer(),
+		})
+
+		const sentPerFlush: number[] = []
+		const sentFrames = new Map<string, number>()
+		for (let frame = 0; frame < 50; frame++) {
+			now = frame * 100
+			emitter.drawAll({ bgColor: '#334455', text: `${frame}` })
+			const before = connection.sentLines.length
+			emitter.flush()
+			sentPerFlush.push(connection.sentLines.length - before)
+			for (const line of connection.sentLines.slice(before)) {
+				const key = /KEY=(\d+)/.exec(line)![1]!
+				sentFrames.set(key, (sentFrames.get(key) ?? 0) + 1)
+			}
+		}
+
+		expect(sentPerFlush.every((count) => count === 0 || count === 4)).toBe(true)
+		expect(sentPerFlush.filter((count) => count === 4).length).toBeGreaterThan(15) // throttled, not stalled
+		expect(new Set(sentFrames.values()).size).toBe(1) // every key got the same number of frames
+	})
+
+	it('reports what was actually sent separately from what was last drawn', () => {
+		// The web UI mirrors sentStyleOf. Mirroring styleOf made throttled animation look smooth in the
+		// browser while the device skipped frames.
+		let now = 0
+		const connection = fakeConnection()
+		const device = makeDevice('KEYS_TOTAL=1 BITMAPS=64', { connection })
+		const emitter = new SurfaceEmitter({
+			device,
+			connection,
+			capabilities: caps,
+			budget: new RenderBudget(4096, 4096, () => now),
+			renderer: new ButtonRenderer(),
+		})
+
+		emitter.draw('0/0', { text: 'one' })
+		emitter.flush()
+		emitter.draw('0/0', { text: 'two' }) // the bucket is empty: deferred
+		emitter.flush()
+
+		expect(emitter.styleOf('0/0').text).toBe('two')
+		expect(emitter.sentStyleOf('0/0').text).toBe('one')
+
+		now = 1000
+		emitter.flush()
+		expect(emitter.sentStyleOf('0/0').text).toBe('two')
+	})
+
 	it('drops the queue and reports overflow when the socket is backed up', async () => {
 		let overflowed = false
 		const connection = fakeConnection(10 * 1024 * 1024)

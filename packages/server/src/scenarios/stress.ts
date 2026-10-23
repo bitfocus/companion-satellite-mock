@@ -34,15 +34,15 @@ export const stressScenario: Scenario = {
 		'keeping up. Auto-stops. Measures the client, not the server — the render cache means the ' +
 		'server barely notices.',
 	wants: ['colors', 'bitmaps'],
-	// The engine's own resolution is the floor; fps is honoured by drawing more per tick if needed.
-	tickMs: 33,
+	// Fast enough for the 30fps ceiling. The frame schedule below decides which ticks draw.
+	tickMs: 10,
 
 	init(context) {
 		const params = StressParamsSchema.parse(context.params)
 		context.state.set('params', params)
 		context.state.set('startedAt', Date.now())
 		context.state.set('frames', 0)
-		context.state.set('lastFrameAt', 0)
+		context.state.set('nextFrameAt', 0)
 		context.drawAll({ bgColor: '#000000', text: '' })
 	},
 
@@ -66,10 +66,14 @@ export const stressScenario: Scenario = {
 		}
 		if (!Number.isFinite(startedAt)) return
 
-		const minInterval = 1000 / params.fps
-		const lastFrameAt = context.state.get('lastFrameAt') as number
-		if (Date.now() - lastFrameAt < minInterval) return
-		context.state.set('lastFrameAt', Date.now())
+		// Frames are due on a fixed schedule, not "at least 1/fps after the last one": the latter loses
+		// a whole tick whenever the timer arrives a millisecond early, so 10fps came out nearer 7 and
+		// unevenly spaced. Falling more than a frame behind resyncs rather than bursting to catch up.
+		const interval = 1000 / params.fps
+		const now = Date.now()
+		const nextFrameAt = context.state.get('nextFrameAt') as number
+		if (now < nextFrameAt) return
+		context.state.set('nextFrameAt', now - nextFrameAt > interval ? now + interval : nextFrameAt + interval)
 
 		const frame = ((context.state.get('frames') as number) ?? 0) + 1
 		context.state.set('frames', frame)

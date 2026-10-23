@@ -37,7 +37,12 @@ export class RenderBudget {
 
 	/** Returns false when the frame should be skipped. */
 	tryConsume(width: number, height: number): boolean {
-		if (this.#bucket.take(width * height)) return true
+		return this.tryConsumePixels(width * height)
+	}
+
+	/** As `tryConsume`, for a total across several bitmaps that must go out together or not at all. */
+	tryConsumePixels(pixels: number): boolean {
+		if (this.#bucket.take(pixels)) return true
 		this.#dropped++
 		return false
 	}
@@ -49,7 +54,11 @@ export class RenderBudget {
 	 * one larger than the whole budget, or it would retry forever. Such a frame is dropped instead.
 	 */
 	canEverAfford(width: number, height: number): boolean {
-		return width * height <= this.#bucket.capacity
+		return this.canEverAffordPixels(width * height)
+	}
+
+	canEverAffordPixels(pixels: number): boolean {
+		return pixels <= this.#bucket.capacity
 	}
 
 	/**
