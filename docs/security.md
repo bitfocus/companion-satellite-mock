@@ -87,8 +87,8 @@ asserting a 10 Hz client is not throttled.
 Prometheus metrics are on their own listener with **two independent defences**, because one mistyped
 proxy rule should not expose operational internals:
 
-1. `METRICS_BIND` defaults to `127.0.0.1`, and the reference Caddyfile has **no route to that port
-   at all** — so the default is closed without depending on a proxy rule being right.
+1. `METRICS_BIND` defaults to `127.0.0.1`, and it is a separate port from the UI, so a reverse proxy
+   needs no rule to keep it private: give it no route at all.
 2. `METRICS_TOKEN`, when set, requires `Authorization: Bearer …` and answers **404** rather than 401,
    so a prober cannot confirm the endpoint exists.
 

@@ -28,8 +28,6 @@
 ## Docs
 
 - **README:**
-  - mark `docker compose up` as the production reference, not a local quick start (it has the
-    real domain and starts Caddy);
   - document the client URL options: `?api=`, `?subs=0`, `?formats=`, `?duplicates=strict`;
   - add an environment variable reference;
   - list `yarn dev`, `yarn dev:ui`, `yarn test:e2e` and `yarn smoke`;

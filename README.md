@@ -26,7 +26,14 @@ node packages/server/dist/main.js
 - Web UI: `http://localhost:16624`
 - Metrics: `http://127.0.0.1:16625/metrics` (loopback by default)
 
-Or `docker compose up`, which also brings up Caddy for TLS.
+Or run the published image:
+
+```sh
+docker run -p 16623:16623 -p 16624:16624 ghcr.io/julusian/companion-satellite-mock
+```
+
+Behind a reverse proxy, set `PUBLIC_ORIGIN` and `TRUSTED_PROXY_HOPS`; see
+[docs/security.md](docs/security.md).
 
 `yarn check` runs format, lint, typecheck and tests.
 

@@ -42,5 +42,3 @@ docs
 # Docker
 Dockerfile
 .dockerignore
-docker-compose.yml
-Caddyfile
