@@ -29,7 +29,7 @@ node packages/server/dist/main.js
 Or run the published image:
 
 ```sh
-docker run -p 16623:16623 -p 16624:16624 ghcr.io/julusian/companion-satellite-mock
+docker run -p 16623:16623 -p 16624:16624 ghcr.io/bitfocus/companion-satellite-mock
 ```
 
 Behind a reverse proxy, set `PUBLIC_ORIGIN` and `TRUSTED_PROXY_HOPS`; see

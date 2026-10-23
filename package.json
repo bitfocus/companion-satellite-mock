@@ -2,6 +2,10 @@
   "name": "companion-satellite-mock",
   "version": "0.0.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitfocus/companion-satellite-mock.git"
+  },
   "private": true,
   "type": "module",
   "packageManager": "yarn@4.10.3",
