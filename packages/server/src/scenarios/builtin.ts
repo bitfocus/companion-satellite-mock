@@ -24,7 +24,7 @@ function paint(context: ScenarioContext, index: number, style: Parameters<Scenar
 // 1. Unclaimed — the default, and the one an evaluator sees.
 // ---------------------------------------------------------------------------------------------
 
-export function unclaimedScenario(claimCode: string, publicUrl: string): Scenario {
+export function unclaimedScenario(claimCode: string): Scenario {
 	const formatted = formatClaimCode(claimCode)
 
 	return {
@@ -38,11 +38,11 @@ export function unclaimedScenario(claimCode: string, publicUrl: string): Scenari
 		init(context) {
 			context.drawAll({ bgColor: '#101014', textColor: '#ffffff', text: '' })
 
-			// Slots are allocated in priority order and never overlap. An earlier version placed the
-			// URL at `length - 2` and the live button at `length - 1` *after* laying out the code,
-			// which on an 8-key surface overwrote the sixth character — the surface then showed a
-			// five-character code that could not be claimed. Anything optional is only drawn if a
-			// slot is genuinely spare.
+			// The header takes the first key and the code the ones after it; everything else stays the
+			// idle background. The code is the one thing that must always fit, so it is laid out last of
+			// the two and never overwritten — an earlier version drew an optional URL button on top of
+			// the sixth code key on an 8-key surface, leaving a five-character code that could not be
+			// claimed (see unclaimed.test.ts).
 			const total = context.controlIds.length
 			let next = 0
 
@@ -53,8 +53,8 @@ export function unclaimedScenario(claimCode: string, publicUrl: string): Scenari
 				paint(context, header, { bgColor: '#8a2be2', text: 'UN-\nCLAIMED', textColor: '#ffffff' })
 			}
 
-			// The code is the one thing that must always fit. One character per key when there is
-			// room for all of them, otherwise the whole code on a single key.
+			// One character per key when there is room for all of them, otherwise the whole code on a
+			// single key.
 			if (total - next >= claimCode.length) {
 				for (const character of claimCode) {
 					const slot = take()
@@ -72,22 +72,10 @@ export function unclaimedScenario(claimCode: string, publicUrl: string): Scenari
 					paint(context, slot, { bgColor: '#1e3a5f', text: formatted, textColor: '#ffffff' })
 				}
 			}
-
-			// Optional, in decreasing order of usefulness. A surface with no spare keys gets neither,
-			// and still shows a claimable code.
-			const live = take()
-			if (live !== undefined) {
-				context.state.set('liveControl', context.controlIds[live])
-				paint(context, live, { bgColor: '#005f5f', text: 'PRESS\nME' })
-			}
-
-			const urlSlot = take()
-			if (urlSlot !== undefined) {
-				paint(context, urlSlot, { bgColor: '#3f3f00', text: publicUrl, fontSize: 8 })
-			}
 		},
 
 		onPress(context, controlId, pressed) {
+			// Any key lights up when pressed, so the surface visibly responds before it is claimed.
 			context.draw(controlId, { pressed, bgColor: pressed ? '#00b0b0' : '#005f5f' })
 		},
 

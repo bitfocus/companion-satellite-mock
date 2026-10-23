@@ -37,4 +37,21 @@ describe('RenderBudget', () => {
 		now = 1000 // one second later
 		expect(budget.available).toBeCloseTo(1000) // refilled at the rate, not the burst
 	})
+
+	it('replenishes at most once per interval, so looping on it cannot bypass the rate', () => {
+		let now = 0
+		const budget = new RenderBudget(1000, 5000, () => now)
+		expect(budget.tryConsume(50, 100)).toBe(true)
+		budget.replenish()
+		expect(budget.available).toBe(5000) // the first switch gets a full burst
+
+		expect(budget.tryConsume(50, 100)).toBe(true)
+		now = 500
+		budget.replenish() // too soon: ignored
+		expect(budget.available).toBeCloseTo(500)
+
+		now = 2000
+		budget.replenish()
+		expect(budget.available).toBe(5000)
+	})
 })

@@ -1,5 +1,8 @@
 import { TokenBucket, type Clock } from '../limits.js'
 
+/** How often `replenish()` may actually refill. Bounds what a caller looping on it can extract. */
+const REPLENISH_INTERVAL_MS = 2000
+
 /**
  * A ceiling on how many pixels may be rendered per second.
  *
@@ -15,9 +18,12 @@ import { TokenBucket, type Clock } from '../limits.js'
  */
 export class RenderBudget {
 	readonly #bucket: TokenBucket
+	readonly #now: Clock
+	#lastReplenish = -Infinity
 	#dropped = 0
 
-	constructor(pixelsPerSecond: number, burstPixels = pixelsPerSecond, now?: Clock) {
+	constructor(pixelsPerSecond: number, burstPixels = pixelsPerSecond, now: Clock = Date.now) {
+		this.#now = now
 		// A full surface redraw arrives as one clump and must not be throttled just for being
 		// simultaneous — so the burst capacity has to hold at least one whole repaint. One second's
 		// worth is enough for a small surface but *not* for a large hi-DPI one (a 63-key surface at
@@ -44,6 +50,22 @@ export class RenderBudget {
 	 */
 	canEverAfford(width: number, height: number): boolean {
 		return width * height <= this.#bucket.capacity
+	}
+
+	/**
+	 * Refill to a full burst.
+	 *
+	 * For a deliberate one-off repaint — a scenario switch — that should land at once rather than
+	 * trickle in as the bucket refills. The trigger is reachable from the public UI, and the tRPC
+	 * limiter alone would still allow several free bursts a second, so this refills at most once per
+	 * REPLENISH_INTERVAL_MS and is otherwise a no-op. Worst case is the sustained rate plus one extra
+	 * burst per interval.
+	 */
+	replenish(): void {
+		const now = this.#now()
+		if (now - this.#lastReplenish < REPLENISH_INTERVAL_MS) return
+		this.#lastReplenish = now
+		this.#bucket.fill()
 	}
 
 	get dropped(): number {

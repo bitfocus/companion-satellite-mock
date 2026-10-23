@@ -68,7 +68,7 @@ function renderOn(keysTotal: number, keysPerRow: number): { texts: string[]; sen
 		budget: new RenderBudget(1_000_000_000),
 	})
 
-	new ScenarioEngine(logger).attach(device, emitter, unclaimedScenario(CODE, 'mock.test'))
+	new ScenarioEngine(logger).attach(device, emitter, unclaimedScenario(CODE))
 	emitter.flush()
 
 	const texts = sent
@@ -115,11 +115,10 @@ describe('the Unclaimed screen', () => {
 		expect(new Set(keys).size).toBe(keys.length)
 	})
 
-	it('drops the optional extras rather than the code when space is tight', () => {
-		// Seven keys: header plus six code characters, and nothing left over.
+	it('spells the whole code when the header plus code exactly fills the surface', () => {
+		// Seven keys: header plus six code characters, and nothing left over to overwrite them.
 		const { texts } = renderOn(7, 7)
 		expect(codeFrom(texts)).toBe(CODE)
-		expect(texts.join(' ')).not.toContain('mock.test')
 	})
 
 	it('falls back to the whole code on one key when it cannot be spelled out', () => {

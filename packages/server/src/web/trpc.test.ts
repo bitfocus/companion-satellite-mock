@@ -20,7 +20,7 @@ const clients: TestSatelliteClient[] = []
 
 async function startStack(overrides: Partial<Config> = {}) {
 	const config = { ...loadConfig({ NODE_ENV: 'test' }), SATELLITE_PORT: 0, ...overrides }
-	const runtime = new MockRuntime({ config, logger, publicUrl: 'mock.test' })
+	const runtime = new MockRuntime({ config, logger })
 	const server = new SatelliteServer({
 		config,
 		logger,

@@ -49,6 +49,12 @@ export class TokenBucket {
 		this.#refill()
 		return this.#tokens
 	}
+
+	/** Top the bucket back to full. For a deliberate, one-off burst that should not be throttled. */
+	fill(): void {
+		this.#refill()
+		this.#tokens = this.capacity
+	}
 }
 
 export interface ConnectionLimits {

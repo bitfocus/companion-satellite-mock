@@ -18,7 +18,6 @@ import type { ButtonStyle } from './render/buttonStyle.js'
 export interface RuntimeOptions {
 	config: Config
 	logger: Logger
-	publicUrl?: string
 	renderer?: ButtonRenderer
 }
 
@@ -47,14 +46,12 @@ export class MockRuntime {
 
 	readonly #config: Config
 	readonly #logger: Logger
-	readonly #publicUrl: string
 	readonly #devices = new Map<string, DeviceRuntime>()
 	#sweep: NodeJS.Timeout | undefined
 
 	constructor(options: RuntimeOptions) {
 		this.#config = options.config
 		this.#logger = options.logger.child({ component: 'runtime' })
-		this.#publicUrl = options.publicUrl ?? options.config.PUBLIC_ORIGIN ?? 'this server'
 		this.renderer = options.renderer ?? new ButtonRenderer()
 
 		this.sessions = new SessionManager({
@@ -112,12 +109,15 @@ export class MockRuntime {
 		if (!scenario) return false
 
 		runtime.emitter.clearKeys()
+		// A switch is a deliberate, one-off full repaint — paint it at once rather than letting the
+		// budget trickle it in over a second. Sustained animation inside the scenario is still throttled.
+		runtime.budget.replenish()
 		this.scenarios.attach(runtime.device, runtime.emitter, scenario, params)
 		return true
 	}
 
 	#unclaimedFor(session: MockSession): Scenario {
-		return unclaimedScenario(session.claimCode, this.#publicUrl)
+		return unclaimedScenario(session.claimCode)
 	}
 
 	/** Current config values for a device, for the UI to render. */
