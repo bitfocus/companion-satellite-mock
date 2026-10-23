@@ -500,7 +500,7 @@ better options; the mitigation here is the caps, not a claim of impossibility.
 | Bitmap request                     | ≤ 512×512, ≤ 4 MB/s of pixel output per session                                                                                                                                                      |
 | Concurrent connections             | 5 per IP (IPv6 bucketed by /64), 500 server-wide                                                                                                                                                     |
 | New connections                    | 30/min per IP, burst 10                                                                                                                                                                              |
-| Claim attempts                     | 5/min per IP with backoff; constant-time compare; codes expire                                                                                                                                       |
+| Claim attempts                     | 10/min per IP (IPv6 by /64); 120 failed attempts/min server-wide; constant-time compare; codes expire                                                                                                |
 | Outbound queue                     | Bounded bytes per connection; latest-wins coalescing per control (as Companion's `ImageWriteQueue` does); terminate on overflow rather than buffering                                                |
 | Session lifetime                   | Idle disconnect 5 s (protocol); session GC 10 min after _both_ the client disconnects and the last controller unsubscribes; ≤4 held sessions per UI client; absolute session and connection cap 12 h |
 | Trace buffer                       | 2000 lines/session, payloads elided                                                                                                                                                                  |
@@ -512,7 +512,8 @@ better options; the mitigation here is the caps, not a claim of impossibility.
   configured public origin).
 - Strict CSP, `helmet`-style headers, no CORS, no cookies beyond an opaque UI client id, no uploads,
   small body limits, static assets served immutably.
-- Every tRPC input validated with zod; mutations rate limited per UI client id _and_ per IP.
+- Every tRPC input validated with zod; mutations rate limited per IP. Never per UI client id: the
+  browser chooses it, so a limit keyed on it is bypassed by sending a new one each time.
 - Never `eval`, never build filesystem paths from input, `Object.create(null)` + banned prototype
   keys in the parser, base64 size-checked _before_ decode, JSON parsed under a size cap and then
   schema-validated.

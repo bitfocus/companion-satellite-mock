@@ -57,6 +57,53 @@ export class TokenBucket {
 	}
 }
 
+/**
+ * One token bucket per address, keyed by `normaliseIp`, with a bounded number of entries.
+ *
+ * For limits on the public web UI, where the browser's own id is client-chosen and so cannot be
+ * what a limit is keyed on. A full bucket behaves exactly like a missing one, so those are dropped
+ * whenever the map reaches `maxEntries`; if that frees nothing, the oldest entry goes. Evicting
+ * hands that address a fresh allowance, but forcing it means cycling through `maxEntries` distinct
+ * addresses (or /64s), which is exactly what per-address limiting already assumes is expensive.
+ */
+export class AddressBuckets {
+	readonly #buckets = new Map<string, TokenBucket>()
+
+	constructor(
+		private readonly capacity: number,
+		private readonly refillPerSecond: number,
+		private readonly maxEntries = 10_000,
+		private readonly now: Clock = Date.now
+	) {}
+
+	take(ip: string, count = 1): boolean {
+		return this.#bucketFor(normaliseIp(ip)).take(count)
+	}
+
+	get size(): number {
+		return this.#buckets.size
+	}
+
+	#bucketFor(key: string): TokenBucket {
+		const existing = this.#buckets.get(key)
+		if (existing) return existing
+
+		if (this.#buckets.size >= this.maxEntries) {
+			for (const [other, bucket] of this.#buckets) {
+				if (bucket.available >= bucket.capacity) this.#buckets.delete(other)
+			}
+			if (this.#buckets.size >= this.maxEntries) {
+				const oldest = this.#buckets.keys().next().value
+				if (oldest !== undefined) this.#buckets.delete(oldest)
+			}
+		}
+
+		const bucket = new TokenBucket(this.capacity, this.refillPerSecond, this.now)
+		this.#buckets.set(key, bucket)
+		return bucket
+	}
+}
+
 export interface ConnectionLimits {
 	maxTotal: number
 	maxPerIp: number

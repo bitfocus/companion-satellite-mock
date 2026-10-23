@@ -164,6 +164,7 @@ describe('the subscriptions API', () => {
 			runtime,
 			satellite: server,
 			uiClientId: 'owner',
+			clientIp: '203.0.113.1',
 		} satisfies TrpcContext)
 		const { sessionId } = await owner.claim({ code: runtime.sessions.all()[0]!.claimCode })
 

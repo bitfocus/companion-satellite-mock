@@ -30,7 +30,7 @@ describe('SessionManager claiming', () => {
 	it('claims by code', () => {
 		const { manager } = makeManager()
 		const session = manager.create()
-		expect(manager.claim(session.claimCode, 'browser-1')).toEqual({ ok: true, session })
+		expect(manager.claim(session.claimCode, 'browser-1', '203.0.113.1')).toEqual({ ok: true, session })
 		expect(session.state).toBe('offline') // no connection attached in this test
 		expect(session.claimedBy).toBe('browser-1')
 	})
@@ -38,44 +38,70 @@ describe('SessionManager claiming', () => {
 	it('rejects an unknown code', () => {
 		const { manager } = makeManager()
 		manager.create()
-		expect(manager.claim('ZZZZZZ', 'browser-1')).toEqual({ ok: false, reason: 'not-found' })
+		expect(manager.claim('ZZZZZZ', 'browser-1', '203.0.113.1')).toEqual({ ok: false, reason: 'not-found' })
 	})
 
 	it('rate limits attempts, which is what makes a six-character code sufficient', () => {
 		const { manager, clock } = makeManager()
 		manager.create()
-		for (let i = 0; i < 5; i++) expect(manager.claim('ZZZZZZ', 'browser-1').reason).toBe('not-found')
-		expect(manager.claim('ZZZZZZ', 'browser-1')).toEqual({ ok: false, reason: 'rate-limited' })
+		for (let i = 0; i < 10; i++)
+			expect(manager.claim('ZZZZZZ', 'browser-1', '203.0.113.1').reason).toBe('not-found')
+		expect(manager.claim('ZZZZZZ', 'browser-1', '203.0.113.1')).toEqual({ ok: false, reason: 'rate-limited' })
 
 		clock.advance(60_000)
-		expect(manager.claim('ZZZZZZ', 'browser-1').reason).toBe('not-found')
+		expect(manager.claim('ZZZZZZ', 'browser-1', '203.0.113.1').reason).toBe('not-found')
 	})
 
-	it('rate limits per browser, so one attacker cannot lock everyone else out', () => {
+	it('rate limits by address, so sending a fresh browser id each time does not help', () => {
 		const { manager } = makeManager()
 		manager.create()
-		for (let i = 0; i < 6; i++) manager.claim('ZZZZZZ', 'attacker')
-		expect(manager.claim('ZZZZZZ', 'attacker').reason).toBe('rate-limited')
-		expect(manager.claim('ZZZZZZ', 'someone-else').reason).toBe('not-found')
+		for (let i = 0; i < 10; i++) manager.claim('ZZZZZZ', `attacker-${i}`, '203.0.113.66')
+		expect(manager.claim('ZZZZZZ', 'attacker-new', '203.0.113.66').reason).toBe('rate-limited')
+		expect(manager.claim('ZZZZZZ', 'someone-else', '198.51.100.9').reason).toBe('not-found')
+	})
+
+	it('treats an IPv6 /64 as one address', () => {
+		const { manager } = makeManager()
+		manager.create()
+		for (let i = 0; i < 10; i++) manager.claim('ZZZZZZ', 'attacker', `2001:db8:1:2::${i + 1}`)
+		expect(manager.claim('ZZZZZZ', 'attacker', '2001:db8:1:2::ffff').reason).toBe('rate-limited')
+	})
+
+	it('caps failed guesses server-wide, however many addresses they come from', () => {
+		const { manager, clock } = makeManager()
+		const session = manager.create()
+		for (let i = 0; i < 120; i++) {
+			expect(manager.claim('ZZZZZZ', 'attacker', `192.0.2.${i}`).reason).toBe('not-found')
+		}
+		expect(manager.claim('ZZZZZZ', 'attacker', '192.0.2.200').reason).toBe('busy')
+		// A right code is refused too while the cap is hit, or guessing would just carry on.
+		expect(manager.claim(session.claimCode, 'owner', '198.51.100.9').reason).toBe('busy')
+
+		clock.advance(1000) // two failures' worth of refill
+		expect(manager.claim(session.claimCode, 'owner', '198.51.100.9').ok).toBe(true)
 	})
 
 	it('caps how many sessions one browser may hold', () => {
 		const { manager } = makeManager()
 		const sessions = Array.from({ length: 5 }, () => manager.create())
-		for (let i = 0; i < 4; i++) expect(manager.claim(sessions[i]!.claimCode, 'browser-1').ok).toBe(true)
-		expect(manager.claim(sessions[4]!.claimCode, 'browser-1')).toEqual({ ok: false, reason: 'too-many-sessions' })
+		for (let i = 0; i < 4; i++)
+			expect(manager.claim(sessions[i]!.claimCode, 'browser-1', '203.0.113.1').ok).toBe(true)
+		expect(manager.claim(sessions[4]!.claimCode, 'browser-1', '203.0.113.1')).toEqual({
+			ok: false,
+			reason: 'too-many-sessions',
+		})
 	})
 
 	it('mints a fresh code on unclaim, so the old one cannot be reused', () => {
 		const { manager } = makeManager()
 		const session = manager.create()
 		const original = session.claimCode
-		manager.claim(original, 'browser-1')
+		manager.claim(original, 'browser-1', '203.0.113.1')
 		session.unclaim()
 
 		expect(session.claimCode).not.toBe(original)
-		expect(manager.claim(original, 'browser-2').reason).toBe('not-found')
-		expect(manager.claim(session.claimCode, 'browser-2').ok).toBe(true)
+		expect(manager.claim(original, 'browser-2', '203.0.113.1').reason).toBe('not-found')
+		expect(manager.claim(session.claimCode, 'browser-2', '203.0.113.1').ok).toBe(true)
 	})
 })
 
@@ -83,7 +109,7 @@ describe('SessionManager continuity', () => {
 	it('reuses the session when a client reconnects with the same primary device id', () => {
 		const { manager } = makeManager()
 		const first = manager.attach(fakeConnection(), 'streamdeck:123')
-		manager.claim(first.claimCode, 'browser-1')
+		manager.claim(first.claimCode, 'browser-1', '203.0.113.1')
 		const code = first.claimCode
 
 		manager.detach(first)

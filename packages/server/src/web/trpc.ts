@@ -4,7 +4,7 @@ import { KNOWN_API_VERSIONS } from '@satellite-mock/protocol'
 import { BUILTIN_SCENARIOS } from '../scenarios/builtin.js'
 import type { MockRuntime } from '../runtime.js'
 import { isSafeValue } from '@satellite-mock/protocol'
-import { TokenBucket } from '../limits.js'
+import { AddressBuckets } from '../limits.js'
 import { ChaosConfigSchema, DEFAULT_CHAOS } from '../chaos.js'
 import { MAX_BLACKOUT_MS } from '../blackout.js'
 import type { SatelliteServer } from '../satelliteServer.js'
@@ -15,26 +15,26 @@ export interface TrpcContext {
 	satellite: SatelliteServer
 	/** Opaque per-browser id, from localStorage. Not a credential — it scopes, it does not authorise. */
 	uiClientId: string
+	/**
+	 * The browser's address, resolved through TRUSTED_PROXY_HOPS. What rate limits key on, because
+	 * `uiClientId` is whatever the browser says it is and a limit keyed on it is no limit at all.
+	 */
+	clientIp: string
 }
 
 const t = initTRPC.context<TrpcContext>().create()
 
 /**
- * Mutations are rate limited per browser.
+ * Mutations are rate limited per client address.
  *
  * The UI is public and unauthenticated, so every mutation is reachable by anyone. The claim flow has
  * its own stricter limiter in SessionManager; this is the blanket one that stops a script driving
  * scenario switches or raw sends in a tight loop.
  */
-const mutationBuckets = new Map<string, TokenBucket>()
+const mutationBuckets = new AddressBuckets(60, 10)
 
 const rateLimited = t.middleware(({ ctx, next }) => {
-	let bucket = mutationBuckets.get(ctx.uiClientId)
-	if (!bucket) {
-		bucket = new TokenBucket(60, 10)
-		mutationBuckets.set(ctx.uiClientId, bucket)
-	}
-	if (!bucket.take()) {
+	if (!mutationBuckets.take(ctx.clientIp)) {
 		throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Slow down' })
 	}
 	return next()
@@ -188,16 +188,18 @@ export const appRouter = t.router({
 	),
 
 	claim: mutation.input(z.object({ code: z.string().min(1).max(32) })).mutation(({ ctx, input }) => {
-		const result = ctx.runtime.sessions.claim(input.code, ctx.uiClientId)
+		const result = ctx.runtime.sessions.claim(input.code, ctx.uiClientId, ctx.clientIp)
 		if (!result.ok) {
 			throw new TRPCError({
-				code: result.reason === 'rate-limited' ? 'TOO_MANY_REQUESTS' : 'NOT_FOUND',
+				code: result.reason === 'rate-limited' || result.reason === 'busy' ? 'TOO_MANY_REQUESTS' : 'NOT_FOUND',
 				message:
 					result.reason === 'rate-limited'
 						? 'Too many attempts. Wait a moment.'
-						: result.reason === 'too-many-sessions'
-							? 'You already hold the maximum number of sessions'
-							: 'No session with that code',
+						: result.reason === 'busy'
+							? 'The server is refusing claims for a moment. Try again shortly.'
+							: result.reason === 'too-many-sessions'
+								? 'You already hold the maximum number of sessions'
+								: 'No session with that code',
 			})
 		}
 

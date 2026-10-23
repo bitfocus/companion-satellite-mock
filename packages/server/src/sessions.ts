@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { claimCodeMatches, generateClaimCode } from './claimCode.js'
 import type { Device } from './devices.js'
 import type { SatelliteSession } from './satelliteSession.js'
-import { TokenBucket, type Clock } from './limits.js'
+import { AddressBuckets, TokenBucket, type Clock } from './limits.js'
 
 /** One line of the protocol trace, with payloads already elided. */
 export interface TraceEntry {
@@ -131,25 +131,35 @@ export interface SessionManagerOptions {
 	maxLifetimeMs: number
 	maxTrace?: number
 	maxSessionsPerUiClient?: number
+	/** Per client address (IPv6 by /64), successes included. */
 	claimAttemptsPerMinute?: number
+	/** Server-wide, failures only. The ceiling on guessing that holds however many addresses a guesser has. */
+	claimFailuresPerMinute?: number
 	now?: Clock
 }
 
 export type ClaimResult =
-	{ ok: true; session: MockSession } | { ok: false; reason: 'not-found' | 'rate-limited' | 'too-many-sessions' }
+	| { ok: true; session: MockSession }
+	| { ok: false; reason: 'not-found' | 'rate-limited' | 'busy' | 'too-many-sessions' }
 
 /**
  * Owns every session, and the claim-code lookup.
  *
- * Claiming is the one place a stranger can act on someone else's session, so it is rate limited per
- * UI client and the code comparison is constant time. Session contents are explicitly not
- * confidential — the design says so — but making them trivially enumerable would still be rude.
+ * Claiming is the one place a stranger can act on someone else's session, and a valid code takes a
+ * session over even if it is already claimed. So guessing is limited twice: per client address,
+ * never per UI client id — that id is chosen by the browser, and a limit keyed on it is bypassed by
+ * sending a new one each time — and server-wide on failures, which is what bounds a guesser holding
+ * many addresses. At the default 120 failures a minute against 32^6 codes, a guesser running flat
+ * out for a day has about a 1-in-6000 chance per live session of hitting one. The cost is that
+ * enough addresses guessing together can lock out claiming for everyone until they stop; for a test
+ * server that is the right way round. The code comparison is constant time.
  */
 export class SessionManager {
 	readonly #sessions = new Map<string, MockSession>()
 	/** Continuity index: primary device id → session. */
 	readonly #byPrimaryDevice = new Map<string, MockSession>()
-	readonly #claimBuckets = new Map<string, TokenBucket>()
+	readonly #claimBuckets: AddressBuckets
+	readonly #claimFailures: TokenBucket
 	/**
 	 * Reverse index from live connection to session.
 	 *
@@ -162,7 +172,6 @@ export class SessionManager {
 	readonly #maxLifetimeMs: number
 	readonly #maxTrace: number
 	readonly #maxPerUiClient: number
-	readonly #claimAttemptsPerMinute: number
 	readonly #now: Clock
 
 	constructor(options: SessionManagerOptions) {
@@ -170,8 +179,11 @@ export class SessionManager {
 		this.#maxLifetimeMs = options.maxLifetimeMs
 		this.#maxTrace = options.maxTrace ?? 2000
 		this.#maxPerUiClient = options.maxSessionsPerUiClient ?? 4
-		this.#claimAttemptsPerMinute = options.claimAttemptsPerMinute ?? 5
 		this.#now = options.now ?? Date.now
+		const perAddress = options.claimAttemptsPerMinute ?? 10
+		this.#claimBuckets = new AddressBuckets(perAddress, perAddress / 60, 10_000, this.#now)
+		const failures = options.claimFailuresPerMinute ?? 120
+		this.#claimFailures = new TokenBucket(failures, failures / 60, this.#now)
 	}
 
 	get size(): number {
@@ -228,14 +240,10 @@ export class SessionManager {
 		return this.#byConnection.get(connection)
 	}
 
-	/** Look up by claim code. Rate limited per UI client, and constant-time per candidate. */
-	claim(code: string, uiClientId: string): ClaimResult {
-		let bucket = this.#claimBuckets.get(uiClientId)
-		if (!bucket) {
-			bucket = new TokenBucket(this.#claimAttemptsPerMinute, this.#claimAttemptsPerMinute / 60, this.#now)
-			this.#claimBuckets.set(uiClientId, bucket)
-		}
-		if (!bucket.take()) return { ok: false, reason: 'rate-limited' }
+	/** Look up by claim code, rate limited by `clientIp` (see the class comment). Constant-time per candidate. */
+	claim(code: string, uiClientId: string, clientIp: string): ClaimResult {
+		if (!this.#claimBuckets.take(clientIp)) return { ok: false, reason: 'rate-limited' }
+		if (this.#claimFailures.available < 1) return { ok: false, reason: 'busy' }
 
 		const held = this.all().filter((session) => session.claimedBy === uiClientId).length
 		if (held >= this.#maxPerUiClient) return { ok: false, reason: 'too-many-sessions' }
@@ -246,6 +254,7 @@ export class SessionManager {
 				return { ok: true, session }
 			}
 		}
+		this.#claimFailures.take()
 		return { ok: false, reason: 'not-found' }
 	}
 

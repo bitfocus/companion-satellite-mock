@@ -33,8 +33,9 @@ async function startStack(overrides: Partial<Config> = {}) {
 	await server.listen()
 	started.push({ server, runtime })
 
-	const caller = (uiClientId: string) =>
-		appRouter.createCaller({ runtime, satellite: server, uiClientId } satisfies TrpcContext)
+	// A distinct address per browser id, so one test's guesses do not use up another's allowance.
+	const caller = (uiClientId: string, clientIp = `test:${uiClientId}`) =>
+		appRouter.createCaller({ runtime, satellite: server, uiClientId, clientIp } satisfies TrpcContext)
 	return { server, runtime, caller, url: `ws://127.0.0.1:${server.address!.port}/ws/satellite` }
 }
 
@@ -87,8 +88,18 @@ describe('claiming', () => {
 	it('rate limits repeated guesses', async () => {
 		const { caller } = await startStack()
 		const api = caller('guesser')
-		for (let i = 0; i < 5; i++) await expect(api.claim({ code: 'ZZZZZZ' })).rejects.toThrow()
+		for (let i = 0; i < 10; i++) await expect(api.claim({ code: 'ZZZZZZ' })).rejects.toThrow()
 		await expect(api.claim({ code: 'ZZZZZZ' })).rejects.toThrow(/Too many attempts/)
+	})
+
+	it('rate limits by address, not by the browser-supplied id', async () => {
+		const { caller } = await startStack()
+		for (let i = 0; i < 10; i++) {
+			await expect(caller(`rotating-${i}`, '203.0.113.50').claim({ code: 'ZZZZZZ' })).rejects.toThrow()
+		}
+		await expect(caller('rotating-new', '203.0.113.50').claim({ code: 'ZZZZZZ' })).rejects.toThrow(
+			/Too many attempts/
+		)
 	})
 })
 

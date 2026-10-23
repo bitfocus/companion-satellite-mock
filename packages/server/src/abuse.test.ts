@@ -194,10 +194,11 @@ describe('claim brute force', () => {
 			runtime,
 			satellite: server,
 			uiClientId: 'attacker',
+			clientIp: '203.0.113.66',
 		} satisfies TrpcContext)
 
 		let rateLimited = false
-		for (let i = 0; i < 10; i++) {
+		for (let i = 0; i < 15; i++) {
 			try {
 				await attacker.claim({ code: `GUESS${i}` })
 			} catch (error) {
@@ -209,15 +210,17 @@ describe('claim brute force', () => {
 
 	it('does not let one attacker lock everyone else out', async () => {
 		const { server, runtime } = await startStack()
-		const context = (id: string) =>
-			appRouter.createCaller({ runtime, satellite: server, uiClientId: id } satisfies TrpcContext)
+		const context = (id: string, clientIp: string) =>
+			appRouter.createCaller({ runtime, satellite: server, uiClientId: id, clientIp } satisfies TrpcContext)
 
-		for (let i = 0; i < 10; i++)
-			await context('attacker')
+		for (let i = 0; i < 15; i++)
+			await context('attacker', '203.0.113.66')
 				.claim({ code: 'NOPE00' })
 				.catch(() => undefined)
 
-		await expect(context('innocent').claim({ code: 'NOPE00' })).rejects.toThrow(/No session with that code/)
+		await expect(context('innocent', '198.51.100.9').claim({ code: 'NOPE00' })).rejects.toThrow(
+			/No session with that code/
+		)
 	})
 })
 

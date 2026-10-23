@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConnectionRegistry, normaliseIp, resolveClientIp, TokenBucket } from './limits.js'
+import { AddressBuckets, ConnectionRegistry, normaliseIp, resolveClientIp, TokenBucket } from './limits.js'
 
 /** A controllable clock — a rate limiter you can't test deterministically is one nobody trusts. */
 function fakeClock(start = 1_000_000) {
@@ -180,5 +180,41 @@ describe('ConnectionRegistry', () => {
 		clock.advance(60_000)
 		registry.sweep()
 		expect(registry.trackedAddresses).toBe(1)
+	})
+})
+
+describe('AddressBuckets', () => {
+	it('limits each address independently, with IPv6 collapsed to its /64', () => {
+		const buckets = new AddressBuckets(2, 1, 100, () => 0)
+		expect(buckets.take('203.0.113.1')).toBe(true)
+		expect(buckets.take('::ffff:203.0.113.1')).toBe(true) // the same address, dual-stack
+		expect(buckets.take('203.0.113.1')).toBe(false)
+		expect(buckets.take('198.51.100.1')).toBe(true)
+
+		expect(buckets.take('2001:db8:0:1::1')).toBe(true)
+		expect(buckets.take('2001:db8:0:1::2')).toBe(true)
+		expect(buckets.take('2001:db8:0:1::3')).toBe(false)
+	})
+
+	it('stays bounded however many addresses it sees', () => {
+		let now = 0
+		const buckets = new AddressBuckets(5, 1, 100, () => now)
+		for (let i = 0; i < 1000; i++) {
+			buckets.take(`10.0.${i >> 8}.${i & 255}`)
+			now += 10
+		}
+		expect(buckets.size).toBeLessThanOrEqual(100)
+	})
+
+	it('evicts the idle before the active', () => {
+		let now = 0
+		const buckets = new AddressBuckets(5, 1, 3, () => now)
+		for (let i = 0; i < 5; i++) buckets.take('192.0.2.1') // drained
+		buckets.take('192.0.2.2')
+		buckets.take('192.0.2.3')
+		now = 10_000 // the last two refill to full; the first does too, so drain it again
+		for (let i = 0; i < 5; i++) buckets.take('192.0.2.1')
+		buckets.take('192.0.2.4') // forces a sweep: .2 and .3 are full and go, .1 stays
+		expect(buckets.take('192.0.2.1')).toBe(false)
 	})
 })

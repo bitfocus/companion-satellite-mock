@@ -28,22 +28,23 @@ session, so it cannot be a broadcast relay, file drop or CDN.
 Every one of these has a test that drives it until it fires (`packages/server/src/abuse.test.ts`).
 All are configurable by environment variable.
 
-| Limit                        | Default                            | Variable                                                   |
-| ---------------------------- | ---------------------------------- | ---------------------------------------------------------- |
-| Line length                  | 256 KB                             | `MAX_LINE_BYTES`                                           |
-| WebSocket frame              | 1 MB                               | `MAX_FRAME_BYTES`                                          |
-| Inbound rate                 | 200 msg/s, 512 KB/s per connection | `MAX_MESSAGES_PER_SECOND`, `MAX_BYTES_PER_SECOND`          |
-| Concurrent connections       | 5 per IP, 500 total                | `MAX_CONNECTIONS_PER_IP`, `MAX_CONNECTIONS_TOTAL`          |
-| New connections              | 30/min per IP, burst 10            | `CONNECTIONS_PER_IP_PER_MINUTE`, `CONNECTION_BURST_PER_IP` |
-| Idle timeout                 | 5 s (matches Companion)            | `IDLE_TIMEOUT_MS`                                          |
-| Connection lifetime          | 12 h                               | `MAX_CONNECTION_LIFETIME_MS`                               |
-| Session grace                | 10 min after both ends are gone    | `SESSION_GRACE_MS`                                         |
-| Devices per connection       | 4                                  | —                                                          |
-| Subscriptions per connection | 64                                 | —                                                          |
-| Rendered controls            | 512                                | —                                                          |
-| Bitmap dimension             | 512 px, rejected not clamped       | —                                                          |
-| Claim attempts               | 5/min per browser                  | —                                                          |
-| Reconnect blackout           | 60 s, self-expiring                | —                                                          |
+| Limit                        | Default                                     | Variable                                                   |
+| ---------------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| Line length                  | 256 KB                                      | `MAX_LINE_BYTES`                                           |
+| WebSocket frame              | 1 MB                                        | `MAX_FRAME_BYTES`                                          |
+| Inbound rate                 | 200 msg/s, 512 KB/s per connection          | `MAX_MESSAGES_PER_SECOND`, `MAX_BYTES_PER_SECOND`          |
+| Concurrent connections       | 5 per IP, 500 total                         | `MAX_CONNECTIONS_PER_IP`, `MAX_CONNECTIONS_TOTAL`          |
+| New connections              | 30/min per IP, burst 10                     | `CONNECTIONS_PER_IP_PER_MINUTE`, `CONNECTION_BURST_PER_IP` |
+| Idle timeout                 | 5 s (matches Companion)                     | `IDLE_TIMEOUT_MS`                                          |
+| Connection lifetime          | 12 h                                        | `MAX_CONNECTION_LIFETIME_MS`                               |
+| Session grace                | 10 min after both ends are gone             | `SESSION_GRACE_MS`                                         |
+| Devices per connection       | 4                                           | —                                                          |
+| Subscriptions per connection | 64                                          | —                                                          |
+| Rendered controls            | 512                                         | —                                                          |
+| Bitmap dimension             | 512 px, rejected not clamped                | —                                                          |
+| Claim attempts               | 10/min per IP; 120 failures/min server-wide | —                                                          |
+| Web UI actions               | 10/s per IP, burst 60                       | —                                                          |
+| Reconnect blackout           | 60 s, self-expiring                         | —                                                          |
 
 The frame cap and the line cap are separate on purpose: a line may arrive split across many frames,
 and many lines may arrive coalesced into one, so tying them together disconnects a client that

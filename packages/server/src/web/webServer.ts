@@ -8,6 +8,7 @@ import type { Config } from '../config.js'
 import type { Logger } from '../logging.js'
 import type { MockRuntime } from '../runtime.js'
 import type { SatelliteServer } from '../satelliteServer.js'
+import { resolveClientIp } from '../limits.js'
 import { appRouter, type TrpcContext } from './trpc.js'
 
 export interface WebServerOptions {
@@ -107,7 +108,17 @@ export class WebServer {
 			createContext: ({ req }): TrpcContext => {
 				const url = new URL(req.url ?? '/', 'http://localhost')
 				const uiClientId = url.searchParams.get('client') ?? 'anonymous'
-				return { runtime: this.#runtime, satellite: this.#satellite, uiClientId: uiClientId.slice(0, 64) }
+				const clientIp = resolveClientIp(
+					req.socket.remoteAddress,
+					req.headers['x-forwarded-for'],
+					this.#config.TRUSTED_PROXY_HOPS
+				)
+				return {
+					runtime: this.#runtime,
+					satellite: this.#satellite,
+					uiClientId: uiClientId.slice(0, 64),
+					clientIp,
+				}
 			},
 		})
 
