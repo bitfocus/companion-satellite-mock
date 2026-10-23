@@ -24,24 +24,3 @@
   profiles, config values). Pin `~0.1.x` while it is pre-1.0, and run its conformance corpus
   against the server. Once done, the Bitfocus notice in `LICENSE`, `docs/upstream.md` and
   `docs/shared-package-proposal.md` can go or be cut down.
-
-## Docs
-
-- **README:**
-  - document the client URL options: `?api=`, `?subs=0`, `?formats=`, `?duplicates=strict`;
-  - add an environment variable reference;
-  - list `yarn dev`, `yarn dev:ui`, `yarn test:e2e` and `yarn smoke`;
-  - mention the published image on ghcr.io, the MIT licence, and how to contribute.
-- **docs/protocol.md:**
-  - replace "Apply & bounce" with the Disconnect action on the Network tab;
-  - fix `MAX_LINE_LENGTH` → `UPSTREAM_MAX_LINE_LENGTH` and `ApiVersionProfile` → `capabilitiesFor()`;
-  - list known differences from Companion: no `NONSQUARE=0` padding (until the feature above), and
-    `VARIABLE-VALUE` is not debounced.
-- **docs/security.md:** not every limit has a test in `abuse.test.ts`, so stop saying so, and
-  reword the soak-test note as advice to operators.
-
-## Small fixes
-
-- The raw line placeholder `KEYS-CLEAR DEVICEID="dev1"` contains quotes, which the server refuses.
-- Comments in `render/budget.ts` repeat the disproven claim that PNG encoding blocks the event loop.
-- `TracePanel.tsx` says keepalives are shown "in the sidebar"; they're on the Device tab.

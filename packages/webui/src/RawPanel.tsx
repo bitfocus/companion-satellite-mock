@@ -19,7 +19,7 @@ export function RawPanel({ sessionId }: { sessionId: string }) {
 				<input
 					value={raw}
 					onChange={(event) => setRaw(event.target.value)}
-					placeholder='KEYS-CLEAR DEVICEID="dev1"'
+					placeholder="KEYS-CLEAR DEVICEID=dev1"
 					spellCheck={false}
 					aria-label="Raw protocol line"
 				/>

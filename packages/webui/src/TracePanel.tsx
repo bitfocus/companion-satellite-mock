@@ -6,8 +6,8 @@ import type { TraceEntry } from './App.js'
  *
  * Bitmap payloads are elided server-side — a trace with 20KB of base64 per line is unusable, and
  * nobody reads a bitmap as text. Keepalives never reach the trace at all: at 10Hz they would evict
- * every useful line from the ring buffer within seconds, so they are counted instead and shown in
- * the sidebar.
+ * every useful line from the ring buffer within seconds, so they are counted instead and shown on
+ * the Device tab.
  */
 export function TracePanel({ entries }: { entries: TraceEntry[] }) {
 	const [filter, setFilter] = useState('')

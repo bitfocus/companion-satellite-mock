@@ -22,8 +22,9 @@ session, so it cannot be a broadcast relay, file drop or CDN.
 
 ## Limits
 
-Every one of these has a test that drives it until it fires (`packages/server/src/abuse.test.ts`).
-All are configurable by environment variable.
+Most of these are tested by driving them until they fire, in `packages/server/src/abuse.test.ts`
+and alongside the code they protect. Those with a variable listed can be changed; the rest are
+fixed.
 
 | Limit                        | Default                                     | Variable                                                   |
 | ---------------------------- | ------------------------------------------- | ---------------------------------------------------------- |
@@ -134,5 +135,5 @@ controlled otherwise and would be a way to write arbitrary strings into the log.
 - Set `PUBLIC_ORIGIN` — the tRPC WebSocket only enforces its `Origin` check when one is configured.
 - Set `TRUSTED_PROXY_HOPS` to match the deployment.
 - Set `METRICS_TOKEN` if the container network is not trusted.
-- Run a soak test. This is the one hardening item deliberately not done — it needs an hour of wall
-  clock to mean anything.
+- Watch memory and CPU for the first few days. The limits are tested individually, but a long run
+  under real traffic is the test that matters, and it hasn't been done yet.

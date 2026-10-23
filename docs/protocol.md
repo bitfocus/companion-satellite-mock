@@ -63,20 +63,21 @@ Each of these is a test case in `packages/protocol`.
 
 ## 2. Bounds
 
-| Thing                     | Upstream value                                             | Constant           |
-| ------------------------- | ---------------------------------------------------------- | ------------------ |
-| Receive buffer / max line | 2 MB, then `Line too long` + destroy                       | `MAX_LINE_LENGTH`  |
-| `KEYS_TOTAL`              | 1 … 2000                                                   | `MAX_KEYS_TOTAL`   |
-| `KEYS_PER_ROW`            | 1 … 1000                                                   | `MAX_KEYS_PER_ROW` |
-| `SUBID` charset           | `/^[a-zA-Z0-9\-/]+$/`                                      | —                  |
-| Control id charset        | `/^[a-zA-Z0-9\-/]+$/`                                      | —                  |
-| `LOCATION`                | `/^(\d+)\/(\d+)\/(\d+)$/`                                  | —                  |
-| `PINCODE-KEY` `KEY`       | 0 … 9                                                      | —                  |
-| LED `segments`            | 1 … 200                                                    | schema             |
-| Reserved id prefixes      | `emulator:`, `group:` rejected for `DEVICEID` and `SERIAL` | —                  |
+| Thing                     | Upstream value                                             | Constant                   |
+| ------------------------- | ---------------------------------------------------------- | -------------------------- |
+| Receive buffer / max line | 2 MB, then `Line too long` + destroy                       | `UPSTREAM_MAX_LINE_LENGTH` |
+| `KEYS_TOTAL`              | 1 … 2000                                                   | `MAX_KEYS_TOTAL`           |
+| `KEYS_PER_ROW`            | 1 … 1000                                                   | `MAX_KEYS_PER_ROW`         |
+| `SUBID` charset           | `/^[a-zA-Z0-9\-/]+$/`                                      | —                          |
+| Control id charset        | `/^[a-zA-Z0-9\-/]+$/`                                      | —                          |
+| `LOCATION`                | `/^(\d+)\/(\d+)\/(\d+)$/`                                  | —                          |
+| `PINCODE-KEY` `KEY`       | 0 … 9                                                      | —                          |
+| LED `segments`            | 1 … 200                                                    | schema                     |
+| Reserved id prefixes      | `emulator:`, `group:` rejected for `DEVICEID` and `SERIAL` | —                          |
 
-The mock deliberately tightens some of these (see [security.md](./security.md#limits)) with a
-knob to restore upstream values for compatibility testing.
+The mock deliberately tightens some of these; see [security.md](./security.md#limits). The line
+length can be raised back to upstream's with `MAX_LINE_BYTES`. The other caps (512 rendered
+controls, 4 devices and 64 subscriptions per connection) are fixed.
 
 ## 3. Error strings
 
@@ -113,16 +114,18 @@ is exactly why the mock's framing chaos tool (split/coalesce) is high value.
   from `ApiVersion`, and consult `CAPS` only for features that may be conditionally disabled within a
   version that supports them. The mock's version profiles must honour that split.
 - **Toggling a capability closes connections.** Upstream force-closes every satellite socket when
-  `satellite_subscriptions_enabled` changes, so clients reconnect and re-read `CAPS`. The mock's
-  _Apply & bounce_ does the same thing and is therefore realistic, not a contrivance.
+  `satellite_subscriptions_enabled` changes, so clients reconnect and re-read `CAPS`. In the mock
+  the version and capabilities are chosen per connection by URL, so a client sees new ones the same
+  way: by reconnecting, which the Network tab's Force disconnect triggers.
 - **`DEVICE-CONFIG` is pushed once immediately after `ADD-DEVICE OK`** (when `CONFIG_FIELDS` were
   declared), then again on every change.
 - **`VARIABLE-VALUE` is debounced** upstream (5 ms, max 20 ms) and only sent when the value actually
-  changed.
+  changed. _The mock does not debounce:_ it sends every value its scenario produces.
 - **Subscribing to an empty location is valid** — `OK`, then a `SUB-STATE` for an empty button.
 - **`LOCATION` is sent for all button types but is not always known**, so it is genuinely optional.
 - **`NONSQUARE=0` does not forbid non-square controls** in advanced layouts; it means Companion pads
-  to square with black borders. The mock should reproduce the padding, not reject the layout.
+  to square with black borders. _The mock does not pad yet:_ it renders at the requested size. See
+  TODO.md.
 - **`full-ring` LED mode falls back to `simple`** when the button's gauge is not actually a ring, and
   deadzone segments are black. An absent `LEDS` field means "all off", not "unchanged".
 - **`CHANGE-PAGE` is silently ignored** when the user has disabled page changes for the surface —
@@ -133,7 +136,7 @@ is exactly why the mock's framing chaos tool (split/coalesce) is high value.
 
 ## 6. Version → capability matrix
 
-Drives `ApiVersionProfile` and the version knob. Companion-version column is from the spec.
+Drives `capabilitiesFor()` and the `?api=` URL option. Companion-version column is from the spec.
 
 | API    | Companion | Gate this in the profile                                                                                                                                 |
 | ------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |

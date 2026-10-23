@@ -35,7 +35,17 @@ docker run -p 16623:16623 -p 16624:16624 ghcr.io/julusian/companion-satellite-mo
 Behind a reverse proxy, set `PUBLIC_ORIGIN` and `TRUSTED_PROXY_HOPS`; see
 [docs/security.md](docs/security.md).
 
-`yarn check` runs format, lint, typecheck and tests.
+## Connecting a client
+
+Point the client at `/ws/satellite`. Query parameters on that URL change how the server behaves for
+that connection; the Network tab in the web UI builds the URL for you.
+
+| Parameter            | Effect                                                                            |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `?api=1.9.0`         | Behave as that API version: its `BEGIN`, its `CAPS` (or none), its feature set.   |
+| `?subs=0`            | Advertise subscriptions as disabled, as a Companion with them switched off would. |
+| `?formats=rgb,png`   | Offer only these bitmap formats, from those the version supports.                 |
+| `?duplicates=strict` | Handle a duplicate device id exactly as Companion does (see docs/sessions.md).    |
 
 ## What it does
 
@@ -60,7 +70,7 @@ Behind a reverse proxy, set `PUBLIC_ORIGIN` and `TRUSTED_PROXY_HOPS`; see
 | [`docs/protocol.md`](docs/protocol.md)                               | Implementation notes complementing the official spec: wire quirks, exact bounds and error strings, the version→capability matrix. |
 | [`docs/sessions.md`](docs/sessions.md)                               | How claiming works, what survives a reconnect, and duplicate device ids.                                                          |
 | [`docs/upstream.md`](docs/upstream.md)                               | What is copied from Companion, what is ported, how to refresh each.                                                               |
-| [`docs/shared-package-proposal.md`](docs/shared-package-proposal.md) | Proposal for extracting a shared `@companion-app/satellite-protocol`.                                                             |
+| [`docs/shared-package-proposal.md`](docs/shared-package-proposal.md) | The original proposal for what became `@companion-app/satellite-protocol`.                                                        |
 
 `packages/protocol/corpus/satellite-corpus.json` is a language-agnostic conformance corpus. Any
 client, in any language, can run the same cases against its own parser.
@@ -73,5 +83,46 @@ client, in any language, can run the same cases against its own parser.
 | `server`     | Transport, sessions, rendering, scenarios, fault injection, tRPC API.      |
 | `webui`      | React + Vite front end.                                                    |
 | `testclient` | Headless satellite client for the integration tests.                       |
+| `e2e`        | Playwright tests driving the built server and web UI.                      |
 
 Node 26 · TypeScript · Express 5 · `ws` · tRPC v11 · React · `@napi-rs/canvas`
+
+## Development
+
+| Command          |                                                                         |
+| ---------------- | ----------------------------------------------------------------------- |
+| `yarn dev`       | Server with reload on change.                                           |
+| `yarn dev:ui`    | Vite dev server for the web UI.                                         |
+| `yarn check`     | Format, lint, typecheck and unit tests — what CI runs.                  |
+| `yarn test:e2e`  | Builds everything and runs the Playwright suite.                        |
+| `yarn smoke URL` | Checks a running deployment end to end, e.g. `wss://host/ws/satellite`. |
+
+## Configuration
+
+Everything is set by environment variable. The ones you are likely to need:
+
+| Variable             | Default                |                                                                               |
+| -------------------- | ---------------------- | ----------------------------------------------------------------------------- |
+| `PUBLIC_ORIGIN`      | unset                  | Origin the web UI is served from. When set, the UI socket refuses any other.  |
+| `TRUSTED_PROXY_HOPS` | `0`                    | Reverse proxies in front of the server. See docs/security.md before changing. |
+| `SATELLITE_PORT`     | `16623`                | Satellite client listener.                                                    |
+| `WEB_PORT`           | `16624`                | Web UI and its API.                                                           |
+| `METRICS_PORT`       | `16625`                | Prometheus metrics, bound to `127.0.0.1` (`METRICS_BIND`).                    |
+| `METRICS_TOKEN`      | unset                  | Require `Authorization: Bearer <token>` for metrics.                          |
+| `LOG_LEVEL`          | `info`                 | pino log level.                                                               |
+| `LOG_CLIENT_IPS`     | `1`                    | Log real client addresses alongside the hashed ones. `0` keeps only the hash. |
+| `COMPANION_VERSION`  | `5.1.0+satellite-mock` | Version string reported in `BEGIN`.                                           |
+
+The abuse limits and timeouts (`MAX_*`, `IDLE_TIMEOUT_MS`, `SESSION_GRACE_MS` and others) are listed
+with their defaults in [`packages/server/src/config.ts`](packages/server/src/config.ts) and
+explained in [docs/security.md](docs/security.md).
+
+## Contributing
+
+Issues and pull requests are welcome. `yarn check` should pass, and a change in behaviour should
+come with a test.
+
+## Licence
+
+MIT. Parts of `packages/protocol` are copied or ported from
+[Bitfocus Companion](https://github.com/bitfocus/companion), also MIT; see [LICENSE](LICENSE).
