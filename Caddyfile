@@ -3,7 +3,7 @@
 #
 # Two settings in docker-compose.yml must agree with this file:
 #
-# - PUBLIC_ORIGIN must be exactly the scheme and host below (https://satellite-mock.example.com,
+# - PUBLIC_ORIGIN must be exactly the scheme and host below (https://satellite-mock.companion.free,
 #   no trailing slash). The web UI's socket refuses any other Origin, so a mismatch fails closed:
 #   the UI will not connect.
 # - TRUSTED_PROXY_HOPS must be 1. Caddy, with no `trusted_proxies` configured, discards any
@@ -12,7 +12,7 @@
 #   (`trusted_proxies`) and the hop count must change together, or every per-IP limit either
 #   collapses onto the CDN's address or becomes forgeable.
 
-satellite-mock.example.com {
+satellite-mock.companion.free {
 	encode zstd gzip
 
 	header {

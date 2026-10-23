@@ -8,6 +8,10 @@ Point a client at it and the surface comes to life immediately — no setup, no 
 configure. The surface draws its own claim code, so taking control from the web UI means reading six
 characters off the buttons rather than digging a device id out of the app.
 
+A public instance runs at **https://satellite-mock.companion.free**. Point a client at
+`wss://satellite-mock.companion.free/ws/satellite`, then open the site and type in the code your
+surface shows.
+
 ## Quick start
 
 ```sh

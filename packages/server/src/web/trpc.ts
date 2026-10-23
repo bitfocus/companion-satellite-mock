@@ -165,9 +165,10 @@ const poll = async function* <T>(read: () => T, signal: AbortSignal, intervalMs:
 }
 
 export const appRouter = t.router({
-	server: publicProcedure.query(({ ctx }) => ({
+	// No session count: it is operational detail nobody outside needs, which is also why the proxy
+	// hides /healthz.
+	server: publicProcedure.query(() => ({
 		apiVersions: KNOWN_API_VERSIONS,
-		sessionCount: ctx.runtime.sessions.size,
 	})),
 
 	scenarios: publicProcedure.query(() =>

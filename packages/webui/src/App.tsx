@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { trpc } from './trpc.js'
+import { satelliteUrl } from './satelliteUrl.js'
 import { SurfaceMirror } from './SurfaceMirror.js'
 import { TracePanel } from './TracePanel.js'
 import { ScenarioPanel } from './ScenarioPanel.js'
@@ -100,12 +101,7 @@ function ClaimView({ onClaimed }: { onClaimed: (id: string) => void }) {
 	const [error, setError] = useState<string | null>(null)
 	const [busy, setBusy] = useState(false)
 
-	const wsUrl = useMemo(() => {
-		const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-		// The satellite listener is a different port from the UI. In production the reverse proxy
-		// maps it onto the same host, which is why this is the address shown rather than the internal one.
-		return `${protocol}//${location.hostname}/ws/satellite`
-	}, [])
+	const wsUrl = useMemo(() => satelliteUrl(), [])
 
 	const submit = async (event: React.FormEvent) => {
 		event.preventDefault()
@@ -132,7 +128,6 @@ function ClaimView({ onClaimed }: { onClaimed: (id: string) => void }) {
 			<section className="card">
 				<h2>1. Connect your client</h2>
 				<code className="url">{wsUrl}</code>
-				<p className="hint">Also reachable on port 16623 directly, if you are not behind the proxy.</p>
 			</section>
 
 			<section className="card">

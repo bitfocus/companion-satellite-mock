@@ -13,7 +13,7 @@ services:
       # Number of trusted reverse-proxy hops. Must match the deployment, or X-Forwarded-For can be
       # spoofed by clients — see docs/design.md §9.3.
       TRUSTED_PROXY_HOPS: 1
-      PUBLIC_ORIGIN: https://satellite-mock.example.com
+      PUBLIC_ORIGIN: https://satellite-mock.companion.free
       # Metrics listen on their own port, bound to all interfaces *within the compose network* so a
       # sidecar Prometheus can reach them. Nothing publishes this port to the host and Caddy has no
       # route to it. Set METRICS_TOKEN as well if the network itself is not trusted.

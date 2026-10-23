@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { trpc } from './trpc.js'
+import { satelliteUrl } from './satelliteUrl.js'
 
 export interface ChaosConfig {
 	latencyMs: number
@@ -130,13 +131,12 @@ export function VersionPanel() {
 	const [subs, setSubs] = useState(true)
 	const [formats, setFormats] = useState('')
 
-	const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
 	const params = new URLSearchParams()
 	if (version) params.set('api', version)
 	if (!subs) params.set('subs', '0')
 	if (formats) params.set('formats', formats)
 	const query = params.toString()
-	const url = `${protocol}//${location.hostname}/ws/satellite${query ? `?${query}` : ''}`
+	const url = satelliteUrl(query)
 
 	return (
 		<section className="card" data-testid="version-panel">
