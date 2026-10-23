@@ -47,20 +47,13 @@ export function coerceConfigValue(field: ConfigField, value: unknown): ConfigVal
 	switch (field.type) {
 		case 'static-text':
 			return undefined
-		case 'textinput': {
-			if (typeof value !== 'string') return undefined
-			if (field.regex) {
-				// Companion's regex fields are written as `/…/flags`; accept both that and a bare pattern.
-				const match = /^\/(.*)\/([a-z]*)$/.exec(field.regex)
-				try {
-					const pattern = match ? new RegExp(match[1] ?? '', match[2]) : new RegExp(field.regex)
-					if (!pattern.test(value)) return undefined
-				} catch {
-					// An unparseable regex from the client is not a reason to reject the operator's value.
-				}
-			}
-			return value
-		}
+		case 'textinput':
+			// A declared `regex` is deliberately not enforced here. It comes from the satellite client
+			// and the value from the web UI, and on a public server one person can supply both: a
+			// catastrophically backtracking pattern like /^(a+)+$/ against thirty characters would hold
+			// the event loop, and with it every session on the server, for minutes. The web UI checks
+			// the pattern in the operator's own browser instead, where a bad one only stalls their tab.
+			return typeof value === 'string' ? value : undefined
 		case 'dropdown': {
 			if (typeof value !== 'string' && typeof value !== 'number') return undefined
 			if (field.allowCustom) return value

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { trpc } from './trpc.js'
 
 /**
@@ -28,6 +28,24 @@ export type ConfigField = ConfigFieldBase &
 		| { type: 'number'; min: number; max: number; default?: number; step?: number }
 		| { type: 'checkbox'; default?: boolean }
 	)
+
+/**
+ * Compile a field's declared pattern, in Companion's `/…/flags` form or bare.
+ *
+ * Enforced here in the browser and never on the server: the pattern comes from the satellite client,
+ * and a backtracking one would stall the shared server's event loop. Here it can only stall the tab
+ * of whoever connected that client.
+ */
+function fieldPattern(regex: string | undefined): RegExp | undefined {
+	if (!regex) return undefined
+	const match = /^\/(.*)\/([a-z]*)$/.exec(regex)
+	try {
+		return match ? new RegExp(match[1] ?? '', match[2]) : new RegExp(regex)
+	} catch {
+		// An unparseable pattern from the client is not a reason to refuse the operator's value.
+		return undefined
+	}
+}
 
 export function DeviceConfigPanel({
 	sessionId,
@@ -93,7 +111,14 @@ export function DeviceConfigPanel({
 					<label key={field.id} className="field" title={field.tooltip}>
 						<span>{field.label}</span>
 
-						{field.type === 'dropdown' ? (
+						{field.type === 'textinput' ? (
+							<TextField
+								field={field}
+								value={String(value ?? '')}
+								onCommit={(next) => set(field.id, next)}
+								onInvalid={setError}
+							/>
+						) : field.type === 'dropdown' ? (
 							<select
 								value={String(value ?? '')}
 								data-testid={`config-${field.id}`}
@@ -107,18 +132,13 @@ export function DeviceConfigPanel({
 							</select>
 						) : (
 							<input
-								type={field.type === 'number' ? 'number' : 'text'}
+								type="number"
 								value={String(value ?? '')}
 								data-testid={`config-${field.id}`}
-								{...(field.type === 'number'
-									? { min: field.min, max: field.max, step: field.step ?? 1 }
-									: {})}
-								onChange={(event) =>
-									set(
-										field.id,
-										field.type === 'number' ? Number(event.target.value) : event.target.value
-									)
-								}
+								min={field.min}
+								max={field.max}
+								step={field.step ?? 1}
+								onChange={(event) => set(field.id, Number(event.target.value))}
 							/>
 						)}
 
@@ -129,5 +149,48 @@ export function DeviceConfigPanel({
 
 			{error && <p className="error">{error}</p>}
 		</section>
+	)
+}
+
+/**
+ * A text field that keeps a local draft and sends it on blur or Enter, once it matches the declared
+ * pattern. Sending on every keystroke would make a pattern like `^\d{3}$` reject the first digit
+ * typed, leaving the field impossible to fill in.
+ */
+function TextField({
+	field,
+	value,
+	onCommit,
+	onInvalid,
+}: {
+	field: Extract<ConfigField, { type: 'textinput' }>
+	value: string
+	onCommit: (value: string) => void
+	onInvalid: (message: string) => void
+}) {
+	const [draft, setDraft] = useState(value)
+	useEffect(() => setDraft(value), [value])
+
+	const commit = () => {
+		if (draft === value) return
+		const pattern = fieldPattern(field.regex)
+		if (pattern && !pattern.test(draft)) {
+			onInvalid(`${field.label} must match ${field.regex}`)
+			return
+		}
+		onCommit(draft)
+	}
+
+	return (
+		<input
+			type="text"
+			value={draft}
+			data-testid={`config-${field.id}`}
+			onChange={(event) => setDraft(event.target.value)}
+			onBlur={commit}
+			onKeyDown={(event) => {
+				if (event.key === 'Enter') commit()
+			}}
+		/>
 	)
 }

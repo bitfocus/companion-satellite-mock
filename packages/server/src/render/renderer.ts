@@ -53,7 +53,8 @@ export class ButtonRenderer {
 	 * Render to the negotiated wire representation: bare base64 for `rgb`, a `data:` url otherwise.
 	 * The client distinguishes them by the `data:` prefix.
 	 */
-	render(style: ButtonStyle, options: RenderOptions): string {
+	render(unbounded: ButtonStyle, options: RenderOptions): string {
+		const style = boundText(unbounded)
 		const rotation = options.rotation ?? 0
 		const key = styleCacheKey(style, options.width, options.height, options.format, rotation)
 
@@ -79,7 +80,7 @@ export class ButtonRenderer {
 
 	/** Raw RGB bytes, for tests and for anything that needs the buffer rather than base64. */
 	renderRgb(style: ButtonStyle, width: number, height: number, rotation: Rotation = 0): Buffer {
-		return canvasToRgb(this.#draw(style, width, height, rotation))
+		return canvasToRgb(this.#draw(boundText(style), width, height, rotation))
 	}
 
 	/**
@@ -89,7 +90,7 @@ export class ButtonRenderer {
 	 * sampler can read pixels without a round trip through an encoder.
 	 */
 	renderToCanvas(style: ButtonStyle, width: number, height: number, rotation: Rotation = 0): Canvas {
-		return this.#draw(style, width, height, rotation)
+		return this.#draw(boundText(style), width, height, rotation)
 	}
 
 	#draw(style: ButtonStyle, width: number, height: number, rotation: Rotation): Canvas {
@@ -106,6 +107,29 @@ export class ButtonRenderer {
 		drawButton(ctx, style, width, height)
 		return canvas
 	}
+}
+
+/** More than any key can show legibly, and far below what costs real time to lay out. */
+export const MAX_RENDERED_TEXT_CHARS = 200
+export const MAX_RENDERED_TEXT_LINES = 8
+
+/**
+ * Cut text down to what a key could ever show, before it is laid out or used as a cache key.
+ *
+ * Button text can come from the satellite client (variable names and control ids are echoed by
+ * some scenarios), and a line may be 256KB. Laying that out took 1.4s of the server's only thread
+ * per render, which one connection could repeat twice a second; as a cache key it would also have
+ * been stored in full, with the cache counting only the rendered value toward its byte limit.
+ */
+function boundText(style: ButtonStyle): ButtonStyle {
+	if (style.text.length <= MAX_RENDERED_TEXT_CHARS && !style.text.includes('\n')) return style
+	const lines = style.text
+		.slice(0, MAX_RENDERED_TEXT_CHARS * 2)
+		.split('\n')
+		.slice(0, MAX_RENDERED_TEXT_LINES)
+	// By code point, so an emoji or other astral character is never cut in half.
+	const text = Array.from(lines.join('\n')).slice(0, MAX_RENDERED_TEXT_CHARS).join('')
+	return text === style.text ? style : { ...style, text }
 }
 
 /**

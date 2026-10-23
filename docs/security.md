@@ -44,7 +44,16 @@ All are configurable by environment variable.
 | Bitmap dimension             | 512 px, rejected not clamped                | —                                                          |
 | Claim attempts               | 10/min per IP; 120 failures/min server-wide | —                                                          |
 | Web UI actions               | 10/s per IP, burst 60                       | —                                                          |
+| Web UI sockets               | 16 per IP, 1000 total; 64 KB per message    | —                                                          |
+| Rendered text                | 200 characters, 8 lines                     | —                                                          |
 | Reconnect blackout           | 60 s, self-expiring                         | —                                                          |
+
+Nothing the satellite client sends is executed or used to make a request. In particular, a
+`textinput` field's declared `regex` is enforced only in the browser, never on the server: the
+pattern comes from the client and the value from the web UI, and on a public server one person
+controls both, so a backtracking pattern would otherwise hold the event loop for every session.
+Client-supplied text that a scenario draws (variable names, control ids) is cut to 200 characters
+before layout, because laying out a 256 KB line took over a second.
 
 The frame cap and the line cap are separate on purpose: a line may arrive split across many frames,
 and many lines may arrive coalesced into one, so tying them together disconnects a client that

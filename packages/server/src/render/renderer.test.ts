@@ -1,6 +1,6 @@
 import { createCanvas } from '@napi-rs/canvas'
 import { describe, expect, it } from 'vitest'
-import { ButtonRenderer, canvasToRgb } from './renderer.js'
+import { ButtonRenderer, canvasToRgb, MAX_RENDERED_TEXT_CHARS } from './renderer.js'
 import { DEFAULT_BUTTON_STYLE, styleCacheKey, type ButtonStyle } from './buttonStyle.js'
 import { LruCache } from './lru.js'
 
@@ -213,5 +213,36 @@ describe('LruCache', () => {
 		cache.get('a')
 		cache.get('b')
 		expect(cache.stats).toMatchObject({ hits: 1, misses: 1, hitRate: 0.5 })
+	})
+})
+
+describe('untrusted text', () => {
+	it('bounds what it lays out, so a huge label cannot hold the event loop', () => {
+		// A satellite client can get a 256KB string drawn onto a key (a variable name the Variables
+		// scenario echoes). Laid out in full that took 1.4s per render.
+		const renderer = new ButtonRenderer()
+		const started = performance.now()
+		renderer.render(
+			{ ...DEFAULT_BUTTON_STYLE, text: 'W'.repeat(250_000) },
+			{ width: 72, height: 72, format: 'rgb' }
+		)
+		renderer.render(
+			{ ...DEFAULT_BUTTON_STYLE, text: 'W\n'.repeat(100_000) },
+			{ width: 72, height: 72, format: 'rgb' }
+		)
+		expect(performance.now() - started).toBeLessThan(200)
+	})
+
+	it('cuts an over-long label at the limit, by code point', () => {
+		const renderer = new ButtonRenderer()
+		const options = { width: 72, height: 72, format: 'rgb' } as const
+		const prefix = '🎥'.repeat(MAX_RENDERED_TEXT_CHARS)
+		expect(renderer.render({ ...DEFAULT_BUTTON_STYLE, text: `${prefix}tail` }, options)).toBe(
+			renderer.render({ ...DEFAULT_BUTTON_STYLE, text: prefix }, options)
+		)
+		// Short text is untouched: one character less renders differently.
+		expect(renderer.render({ ...DEFAULT_BUTTON_STYLE, text: 'CAM 1' }, options)).not.toBe(
+			renderer.render({ ...DEFAULT_BUTTON_STYLE, text: 'CAM ' }, options)
+		)
 	})
 })

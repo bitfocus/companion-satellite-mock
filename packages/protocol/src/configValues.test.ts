@@ -82,15 +82,13 @@ describe('coerceConfigValue', () => {
 		expect(coerceConfigValue({ ...dropdown, allowCustom: true }, 'z')).toBe('z')
 	})
 
-	it('enforces a textinput regex, in both the bare and /…/ forms', () => {
-		expect(coerceConfigValue({ ...text, regex: '^\\d+$' }, '123')).toBe('123')
-		expect(coerceConfigValue({ ...text, regex: '^\\d+$' }, 'abc')).toBeUndefined()
-		expect(coerceConfigValue({ ...text, regex: '/^[a-z]+$/i' }, 'ABC')).toBe('ABC')
-	})
-
-	it('ignores an unparseable regex rather than rejecting everything', () => {
-		// A malformed pattern comes from the client, and is not a reason to break the operator's UI.
-		expect(coerceConfigValue({ ...text, regex: '([' }, 'anything')).toBe('anything')
+	it('never runs the client-declared regex on the server', () => {
+		// Client-supplied pattern, operator-supplied value: on a public server that is one person
+		// holding the event loop with a backtracking pattern. The browser enforces it instead.
+		const evil = { ...text, regex: '^(a+)+$' }
+		const started = performance.now()
+		expect(coerceConfigValue(evil, `${'a'.repeat(40)}!`)).toBe(`${'a'.repeat(40)}!`)
+		expect(performance.now() - started).toBeLessThan(50)
 	})
 
 	it('never produces a value for static text', () => {

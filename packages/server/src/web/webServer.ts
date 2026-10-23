@@ -8,8 +8,17 @@ import type { Config } from '../config.js'
 import type { Logger } from '../logging.js'
 import type { MockRuntime } from '../runtime.js'
 import type { SatelliteServer } from '../satelliteServer.js'
-import { resolveClientIp } from '../limits.js'
+import { normaliseIp, resolveClientIp } from '../limits.js'
 import { appRouter, type TrpcContext } from './trpc.js'
+
+/**
+ * Largest message the browser may send. The biggest real input is a 4KB raw line; without this the
+ * `ws` default of 100MiB applies, and a few such frames exhaust a container's memory.
+ */
+const MAX_UI_MESSAGE_BYTES = 64 * 1024
+/** UI sockets one address (IPv6 by /64) may hold: plenty of tabs, not an unbounded number of pollers. */
+const MAX_UI_SOCKETS_PER_IP = 16
+const MAX_UI_SOCKETS_TOTAL = 1000
 
 export interface WebServerOptions {
 	config: Config
@@ -38,6 +47,8 @@ export class WebServer {
 	#http: Server | undefined
 	#wss: WebSocketServer | undefined
 	#handler: { broadcastReconnectNotification: () => void } | undefined
+	readonly #socketsByIp = new Map<string, number>()
+	#socketsTotal = 0
 
 	constructor(options: WebServerOptions) {
 		this.#config = options.config
@@ -63,7 +74,7 @@ export class WebServer {
 			// nothing at all. `img-src data:` is needed for the button previews.
 			res.setHeader(
 				'Content-Security-Policy',
-				"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+				"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 			)
 			res.setHeader('X-Content-Type-Options', 'nosniff')
 			res.setHeader('Referrer-Policy', 'no-referrer')
@@ -86,7 +97,7 @@ export class WebServer {
 		const http = createServer(app)
 		this.#http = http
 
-		const wss = new WebSocketServer({ noServer: true })
+		const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_UI_MESSAGE_BYTES })
 		this.#wss = wss
 
 		http.on('upgrade', (request, socket, head) => {
@@ -99,6 +110,30 @@ export class WebServer {
 				socket.destroy()
 				return
 			}
+			const ip = normaliseIp(
+				resolveClientIp(
+					request.socket.remoteAddress,
+					request.headers['x-forwarded-for'],
+					this.#config.TRUSTED_PROXY_HOPS
+				)
+			)
+			const held = this.#socketsByIp.get(ip) ?? 0
+			if (held >= MAX_UI_SOCKETS_PER_IP || this.#socketsTotal >= MAX_UI_SOCKETS_TOTAL) {
+				this.#logger.warn({ held, total: this.#socketsTotal }, 'rejected ws upgrade: too many UI sockets')
+				socket.destroy()
+				return
+			}
+			this.#socketsByIp.set(ip, held + 1)
+			this.#socketsTotal++
+			// On the raw socket rather than the WebSocket: a handshake that fails never produces a
+			// WebSocket, but its socket still closes, so the count cannot leak.
+			socket.once('close', () => {
+				const remaining = (this.#socketsByIp.get(ip) ?? 1) - 1
+				if (remaining <= 0) this.#socketsByIp.delete(ip)
+				else this.#socketsByIp.set(ip, remaining)
+				this.#socketsTotal = Math.max(0, this.#socketsTotal - 1)
+			})
+
 			wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request))
 		})
 
