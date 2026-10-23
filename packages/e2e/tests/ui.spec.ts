@@ -122,7 +122,7 @@ test.describe('scenarios', () => {
 		await claim(page, stack)
 		const scenarios = page.locator('button.scenario')
 
-		await expect(scenarios).toHaveCount(9)
+		await expect(scenarios).toHaveCount(8)
 		for (const text of await scenarios.locator('span').allTextContents()) {
 			expect(text.length).toBeGreaterThan(20)
 		}

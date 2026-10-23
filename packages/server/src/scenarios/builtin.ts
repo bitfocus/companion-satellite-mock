@@ -1,5 +1,4 @@
 import { formatClaimCode } from '../claimCode.js'
-import { stressScenario } from './stress.js'
 import type { Scenario, ScenarioContext } from './types.js'
 
 /**
@@ -454,7 +453,6 @@ export const BUILTIN_SCENARIOS: readonly Scenario[] = [
 	brightnessScenario,
 	variablesScenario,
 	attractScenario,
-	stressScenario,
 ]
 
 export function findScenario(id: string): Scenario | undefined {

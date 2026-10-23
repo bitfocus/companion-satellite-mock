@@ -364,7 +364,7 @@ shows which features the connected client actually negotiated, and greys out wha
 | 9   | **Device config**        | Renders the client's `CONFIG_FIELDS` as a real form in the web UI (same field schema Companion uses) and pushes `DEVICE-CONFIG` on change.                                                                                |
 | 10  | **Subscriptions**        | For clients using `ADD-SUB`: a virtual page grid in the UI whose cells can be edited, streaming `SUB-STATE` to matching subscriptions.                                                                                    |
 | 11  | **Attract / animation**  | A slow, pretty animation (plasma, marquee, clock) at a capped frame rate — for the demo video and for an unattended demo instance.                                                                                        |
-| 12  | **Stress**               | The bounded load tool (§8.3), presented as a scenario.                                                                                                                                                                    |
+| 12  | **Stress**               | _Removed — see §8.4._ The bounded load tool (§8.3), presented as a scenario.                                                                                                                                              |
 
 ## 8. Web UI
 
@@ -447,6 +447,10 @@ All of these apply only to the session the acting browser has claimed, and all h
 - **Idle timeout knob**: mirror Companion's 5 s, or shorten/lengthen/disable it.
 
 ### 8.4 Load / throughput (bounded)
+
+> **Removed.** Built as described below, then taken out: the per-device render budget throttled it
+> well below what a client can decode, so it measured the server's ceiling, and with no
+> acknowledgement in the protocol it could not observe the client at all. See docs/scenarios.md.
 
 > Caveat shown in the UI: this mostly measures the _server_ and the network, not the device — and
 > the render cache means the server barely notices. Its real use is finding a client's decode and
